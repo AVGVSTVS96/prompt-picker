@@ -1,0 +1,24 @@
+{
+  "name": "prompt-picker",
+  "module": "src/index.tsx",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/config.ts",
+    "./config": "./src/config.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.tsx",
+    "index": "bun run src/cli/reindex.ts",
+    "postinstall": "bun run scripts/patch-opentui-core.ts"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.3.1",
+    "@opentui/react": "^0.3.1",
+    "react": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.16",
+    "bun-types": "^1.3.14"
+  }
+}
