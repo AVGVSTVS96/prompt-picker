@@ -14,7 +14,7 @@ import {
   type ModelTab,
 } from "../filter.ts";
 import { tokyoNight as T, agentColor } from "../theme.ts";
-import { absTime, oneLine, relTime } from "../format.ts";
+import { absTime, oneLine, relTime, wrapText } from "../format.ts";
 
 interface Props {
   prompts: Prompt[];
@@ -203,14 +203,7 @@ function FilterBar({
       {AGENT_TABS.map((t) => {
         const active = t === agent;
         const label = t === "favorites" ? `★ Favorites(${favCount})` : AGENT_LABEL[t];
-        const color =
-          t === "claude"
-            ? agentColor.claude
-            : t === "codex"
-              ? agentColor.codex
-              : t === "pi"
-                ? agentColor.pi
-                : T.fg;
+        const color = agentColor[t] ?? T.fg;
         return (
           <box
             key={t}
@@ -336,31 +329,6 @@ function Detail({
       </box>
     </box>
   );
-}
-
-function wrapText(text: string, width: number): string[] {
-  const out: string[] = [];
-  for (const para of text.split("\n")) {
-    if (para.length === 0) {
-      out.push("");
-      continue;
-    }
-    let line = "";
-    for (const word of para.split(/(\s+)/)) {
-      if ((line + word).length <= width) {
-        line += word;
-      } else if (word.length > width) {
-        if (line) out.push(line);
-        for (let i = 0; i < word.length; i += width) out.push(word.slice(i, i + width));
-        line = "";
-      } else {
-        if (line.trim()) out.push(line);
-        line = word.trimStart();
-      }
-    }
-    if (line.trim() || para.trim() === "") out.push(line);
-  }
-  return out;
 }
 
 function Footer({

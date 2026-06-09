@@ -31,3 +31,22 @@ export function toMs(ts: unknown): number {
 export function isBlank(s: string): boolean {
   return s.trim().length === 0;
 }
+
+/**
+ * Flatten a message `content` field to plain text, keeping only the part
+ * `type`s in `textTypes`. Accepts a bare string, or an array of
+ * `{ type, text }` parts; anything else yields "".
+ */
+export function joinTextParts(content: unknown, textTypes: readonly string[]): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const part of content) {
+    if (!part || typeof part !== "object") continue;
+    const { type, text } = part as { type?: unknown; text?: unknown };
+    if (typeof type === "string" && textTypes.includes(type) && typeof text === "string") {
+      parts.push(text);
+    }
+  }
+  return parts.join("\n");
+}
