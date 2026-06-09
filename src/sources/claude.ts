@@ -30,10 +30,10 @@ function extractUserText(content: unknown): string | null {
   const parts: string[] = [];
   for (const part of content) {
     if (!part || typeof part !== "object") continue;
-    const type = (part as any).type;
+    const { type, text } = part as { type?: unknown; text?: unknown };
     if (type === "tool_result") return null;
-    if (type === "text" && typeof (part as any).text === "string") {
-      parts.push((part as any).text);
+    if (type === "text" && typeof text === "string") {
+      parts.push(text);
     }
   }
   return parts.length ? parts.join("\n") : null;

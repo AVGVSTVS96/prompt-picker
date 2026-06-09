@@ -1,5 +1,5 @@
 import { classifyModel } from "./model.ts";
-import { isBlank, projectName, promptId, toMs } from "./util.ts";
+import { isBlank, joinTextParts, projectName, promptId, toMs } from "./util.ts";
 import type { Prompt } from "../types.ts";
 
 const INJECTED_PREFIXES = [
@@ -16,6 +16,8 @@ const INJECTED_PREFIXES = [
 
 const INJECTED_INCLUDES = ["References are relative to "];
 
+const TEXT_TYPES = ["text"] as const;
+
 function looksInjected(text: string): boolean {
   const t = text.trimStart();
   if (INJECTED_PREFIXES.some((p) => t.startsWith(p))) return true;
@@ -24,16 +26,7 @@ function looksInjected(text: string): boolean {
 }
 
 function joinContent(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  const parts: string[] = [];
-  for (const part of content) {
-    if (!part || typeof part !== "object") continue;
-    if ((part as any).type === "text" && typeof (part as any).text === "string") {
-      parts.push((part as any).text);
-    }
-  }
-  return parts.join("\n");
+  return joinTextParts(content, TEXT_TYPES);
 }
 
 interface UserLine {

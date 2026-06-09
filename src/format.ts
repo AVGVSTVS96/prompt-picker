@@ -31,3 +31,28 @@ export function oneLine(text: string, max: number): string {
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length > max ? flat.slice(0, max - 1) + "…" : flat;
 }
+
+export function wrapText(text: string, width: number): string[] {
+  const out: string[] = [];
+  for (const para of text.split("\n")) {
+    if (para.length === 0) {
+      out.push("");
+      continue;
+    }
+    let line = "";
+    for (const word of para.split(/(\s+)/)) {
+      if ((line + word).length <= width) {
+        line += word;
+      } else if (word.length > width) {
+        if (line) out.push(line);
+        for (let i = 0; i < word.length; i += width) out.push(word.slice(i, i + width));
+        line = "";
+      } else {
+        if (line.trim()) out.push(line);
+        line = word.trimStart();
+      }
+    }
+    if (line.trim() || para.trim() === "") out.push(line);
+  }
+  return out;
+}
