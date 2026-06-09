@@ -10,6 +10,8 @@
   "scripts": {
     "start": "bun run src/index.tsx",
     "index": "bun run src/cli/reindex.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
     "postinstall": "bun run scripts/patch-opentui-core.ts"
   },
   "dependencies": {
