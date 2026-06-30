@@ -333,6 +333,8 @@ function Detail({
         </text>
         <text fg={T.comment}>{"  ·  "}</text>
         <text fg={T.yellow}>{prompt.modelLabel}</text>
+        <text fg={T.comment}>{"  ·  "}</text>
+        <text fg={T.green}>{oneLine(prompt.sessionId, Math.max(8, innerW - 24))}</text>
         {fav ? <text fg={T.yellow}>{"  ★ favorite"}</text> : null}
       </box>
       <box style={{ flexDirection: "row", height: 1 }}>
