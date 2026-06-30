@@ -1,3 +1,5 @@
+import type { SourceInfo } from "./types.ts";
+
 export const tokyoNight = {
   bg: "#1a1b26",
   bgDark: "#16161e",
@@ -18,8 +20,15 @@ export const tokyoNight = {
   border: "#3b4261",
 } as const;
 
-export const agentColor: Record<string, string> = {
+export const sourceColors: Record<string, string> = {
   claude: tokyoNight.orange,
   codex: tokyoNight.green,
   pi: tokyoNight.magenta,
 };
+
+/** @deprecated Use sourceColors instead. */
+export const agentColor = sourceColors;
+
+export function colorForSource(id: string, sources: SourceInfo[] = []): string {
+  return sources.find((s) => s.id === id)?.color ?? sourceColors[id] ?? tokyoNight.fg;
+}

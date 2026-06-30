@@ -1,5 +1,5 @@
-import { classifyModel } from "./model.ts";
-import { isBlank, projectName, promptId, toMs } from "./util.ts";
+import { makePrompt } from "./api.ts";
+import { isBlank } from "./util.ts";
 import type { Prompt } from "../types.ts";
 
 const INJECTED_PREFIXES = [
@@ -91,20 +91,21 @@ export function parseClaude(file: string, raw: string): Prompt[] {
   const out: Prompt[] = [];
   for (const u of users) {
     const model = modelAt[u.line] ?? sessionFallbackModel;
-    const { modelKey, modelLabel } = classifyModel(model, "anthropic");
-    out.push({
-      id: promptId("claude", file, u.line, u.text),
-      agent: "claude",
-      model,
-      modelKey,
-      modelLabel: model ? modelLabel : "Claude",
-      text: u.text.trim(),
-      ts: toMs(u.ts),
-      cwd: u.cwd,
-      project: projectName(u.cwd),
-      sessionId: u.sessionId,
-      file,
-    });
+    out.push(
+      makePrompt({
+        source: "claude",
+        sourceLabel: "Claude",
+        file,
+        line: u.line,
+        text: u.text,
+        ts: u.ts,
+        cwd: u.cwd,
+        sessionId: u.sessionId,
+        model,
+        provider: "anthropic",
+        modelLabel: model ? undefined : "Claude",
+      }),
+    );
   }
   return out;
 }

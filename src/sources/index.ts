@@ -2,44 +2,15 @@ import { Glob } from "bun";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
-import { configDir } from "../config.ts";
-import { parseClaude } from "./claude.ts";
-import { parseCodex } from "./codex.ts";
-import { parsePi } from "./pi.ts";
-import type { Agent, FileEntry, Prompt } from "../types.ts";
+import { builtinSources } from "./builtins.ts";
+import { applySourceDefaults, sourceInfo, type PromptSource } from "./api.ts";
+import { configDir } from "../paths.ts";
+import type { FileEntry, Prompt, SourceInfo } from "../types.ts";
 
 const HOME = homedir();
 const CACHE_DIR = configDir();
 const CACHE_FILE = join(CACHE_DIR, "index-cache.json");
-const CACHE_VERSION = 8;
-
-interface Source {
-  agent: Agent;
-  root: string;
-  glob: string;
-  parse: (file: string, raw: string) => Prompt[];
-}
-
-const SOURCES: Source[] = [
-  {
-    agent: "claude",
-    root: join(HOME, ".claude", "projects"),
-    glob: "*/*.jsonl",
-    parse: parseClaude,
-  },
-  {
-    agent: "codex",
-    root: join(HOME, ".codex", "sessions"),
-    glob: "**/*.jsonl",
-    parse: parseCodex,
-  },
-  {
-    agent: "pi",
-    root: join(HOME, ".pi", "agent", "sessions"),
-    glob: "*/*.jsonl",
-    parse: parsePi,
-  },
-];
+const CACHE_VERSION = 9;
 
 interface Cache {
   version: number;
@@ -61,31 +32,63 @@ async function saveCache(entries: Record<string, FileEntry>): Promise<void> {
   } catch {}
 }
 
+function expandHome(path: string): string {
+  if (path === "~") return HOME;
+  if (path.startsWith("~/")) return join(HOME, path.slice(2));
+  return path;
+}
+
 export interface IndexResult {
   prompts: Prompt[];
+  sources: SourceInfo[];
   scanned: number;
   parsed: number;
   reused: number;
 }
 
-export async function buildIndex(): Promise<IndexResult> {
+export interface BuildIndexOptions {
+  sources?: PromptSource[];
+}
+
+export async function buildIndex(options: BuildIndexOptions = {}): Promise<IndexResult> {
+  const sources = options.sources ?? builtinSources();
+  const sourceMetas = sources.map(sourceInfo);
   const prev = await loadCache();
   const next: Record<string, FileEntry> = {};
+  const loadedPrompts: Prompt[] = [];
   let parsed = 0;
   let reused = 0;
+  let scanned = 0;
 
   const jobs: Promise<void>[] = [];
 
-  for (const src of SOURCES) {
+  for (const src of sources) {
+    if (src.type === "load") {
+      jobs.push(
+        (async () => {
+          try {
+            const prompts = await src.load({ source: src });
+            loadedPrompts.push(...prompts.map((p) => applySourceDefaults(p, src)));
+            parsed++;
+            scanned++;
+          } catch (err) {
+            console.error(`prompt-picker: ignoring source ${src.id}\n  ${err}`);
+          }
+        })(),
+      );
+      continue;
+    }
+
     const glob = new Glob(src.glob);
     let files: string[];
     try {
-      files = await Array.fromAsync(glob.scan({ cwd: src.root, absolute: true }));
+      files = await Array.fromAsync(glob.scan({ cwd: expandHome(src.root), absolute: true }));
     } catch {
       continue;
     }
 
     for (const file of files) {
+      const cacheKey = `${src.id}:${file}`;
       jobs.push(
         (async () => {
           let stat;
@@ -97,10 +100,11 @@ export async function buildIndex(): Promise<IndexResult> {
           const mtimeMs = stat.mtimeMs;
           const size = stat.size;
 
-          const cached = prev.entries[file];
+          const cached = prev.entries[cacheKey];
           if (cached && cached.mtimeMs === mtimeMs && cached.size === size) {
-            next[file] = cached;
+            next[cacheKey] = cached;
             reused++;
+            scanned++;
             return;
           }
 
@@ -110,9 +114,11 @@ export async function buildIndex(): Promise<IndexResult> {
           } catch {
             return;
           }
-          const prompts = src.parse(file, raw);
-          next[file] = { file, mtimeMs, size, prompts };
+          const parsedPrompts = await src.parse({ file, raw, source: src });
+          const prompts = parsedPrompts.map((p) => applySourceDefaults(p, src));
+          next[cacheKey] = { file, mtimeMs, size, prompts };
           parsed++;
+          scanned++;
         })(),
       );
     }
@@ -121,9 +127,9 @@ export async function buildIndex(): Promise<IndexResult> {
   await Promise.all(jobs);
   await saveCache(next);
 
-  const prompts: Prompt[] = [];
+  const prompts: Prompt[] = [...loadedPrompts];
   for (const entry of Object.values(next)) prompts.push(...entry.prompts);
   prompts.sort((a, b) => b.ts - a.ts);
 
-  return { prompts, scanned: Object.keys(next).length, parsed, reused };
+  return { prompts, sources: sourceMetas, scanned, parsed, reused };
 }

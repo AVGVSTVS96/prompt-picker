@@ -3,15 +3,17 @@ import { createRoot } from "@opentui/react";
 import { App } from "./ui/App.tsx";
 import { buildIndex } from "./sources/index.ts";
 import { Favorites } from "./favorites.ts";
-import { loadConfigFilters, applyConfigFilters } from "./config.ts";
+import { applyConfigFilters, configuredSources, loadConfig } from "./config.ts";
 
-const [{ prompts }, favorites, configFilters] = await Promise.all([
-  buildIndex(),
+const config = await loadConfig();
+const sources = configuredSources(config);
+
+const [indexResult, favorites] = await Promise.all([
+  buildIndex({ sources }),
   Favorites.load(),
-  loadConfigFilters(),
 ]);
 
-const visible = applyConfigFilters(prompts, configFilters);
+const visible = applyConfigFilters(indexResult.prompts, config.filters);
 
 const renderer = await createCliRenderer({
   exitOnCtrlC: false,
@@ -26,4 +28,12 @@ function quit() {
   renderer.destroy();
 }
 
-root.render(<App prompts={visible} favorites={favorites} now={Date.now()} onExit={quit} />);
+root.render(
+  <App
+    prompts={visible}
+    sources={indexResult.sources}
+    favorites={favorites}
+    now={Date.now()}
+    onExit={quit}
+  />,
+);

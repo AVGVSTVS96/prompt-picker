@@ -1,51 +1,56 @@
 import React from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
-import type { Prompt } from "../types.ts";
+import type { Prompt, SourceInfo } from "../types.ts";
 import type { Favorites } from "../favorites.ts";
 import { search } from "../search.ts";
 import {
-  AGENT_LABEL,
-  AGENT_TABS,
   MODEL_LABEL,
   MODEL_TABS,
   filterPrompts,
   modelFilterActive,
-  type AgentTab,
+  sourceTabs,
   type ModelTab,
+  type SourceTabInfo,
 } from "../filter.ts";
-import { tokyoNight as T, agentColor } from "../theme.ts";
+import { tokyoNight as T, colorForSource } from "../theme.ts";
 import { absTime, oneLine, relTime, wrapText } from "../format.ts";
 
 interface Props {
   prompts: Prompt[];
+  sources: SourceInfo[];
   favorites: Favorites;
   now: number;
   onExit: () => void;
 }
 
-export function App({ prompts, favorites, now, onExit }: Props) {
+export function App({ prompts, sources, favorites, now, onExit }: Props) {
   const dims = useTerminalDimensions();
   const W = dims.width;
   const H = dims.height;
 
+  const tabs = React.useMemo(() => sourceTabs(sources), [sources]);
   const [query, setQuery] = React.useState("");
-  const [agentIdx, setAgentIdx] = React.useState(0);
+  const [sourceIdx, setSourceIdx] = React.useState(0);
   const [modelIdx, setModelIdx] = React.useState(0);
   const [selected, setSelected] = React.useState(0);
   const [favTick, setFavTick] = React.useState(0);
 
-  const agent: AgentTab = AGENT_TABS[agentIdx];
+  React.useEffect(() => {
+    setSourceIdx((i) => Math.min(i, Math.max(0, tabs.length - 1)));
+  }, [tabs.length]);
+
+  const source = tabs[sourceIdx] ?? tabs[0];
   const model: ModelTab = MODEL_TABS[modelIdx];
-  const showModels = modelFilterActive(agent);
+  const showModels = modelFilterActive(source.id, sources);
 
   const results = React.useMemo(() => {
-    const base = filterPrompts(prompts, agent, model, (id) => favorites.has(id));
+    const base = filterPrompts(prompts, source.id, model, (id) => favorites.has(id), sources);
     return search(base, query).map((s) => s.prompt);
-  }, [prompts, agent, model, query, favTick, favorites]);
+  }, [prompts, source.id, model, query, favTick, favorites, sources]);
 
   React.useEffect(() => {
     setSelected(0);
-  }, [agent, model, query]);
+  }, [source.id, model, query]);
 
   React.useEffect(() => {
     setSelected((s) => Math.min(s, Math.max(0, results.length - 1)));
@@ -79,7 +84,7 @@ export function App({ prompts, favorites, now, onExit }: Props) {
     if (k.ctrl && name === "u") return setQuery("");
     if (name === "tab") {
       const dir = k.shift ? -1 : 1;
-      setAgentIdx((i) => (i + dir + AGENT_TABS.length) % AGENT_TABS.length);
+      setSourceIdx((i) => (i + dir + tabs.length) % tabs.length);
       setModelIdx(0);
       return;
     }
@@ -103,7 +108,13 @@ export function App({ prompts, favorites, now, onExit }: Props) {
   return (
     <box style={{ flexDirection: "column", width: W, height: H, backgroundColor: T.bg }}>
       <Header query={query} count={results.length} total={prompts.length} width={W} />
-      <FilterBar agent={agent} model={model} showModels={showModels} favCount={favorites.size} />
+      <FilterBar
+        tabs={tabs}
+        active={source.id}
+        model={model}
+        showModels={showModels}
+        favCount={favorites.size}
+      />
       <box style={{ flexDirection: "row", width: W, height: mainH }}>
         <box
           style={{
@@ -124,6 +135,7 @@ export function App({ prompts, favorites, now, onExit }: Props) {
               <Row
                 key={p.id}
                 p={p}
+                sources={sources}
                 now={now}
                 width={listWidth - 1}
                 selected={scrollStart + i === selected}
@@ -132,8 +144,10 @@ export function App({ prompts, favorites, now, onExit }: Props) {
             ))
           )}
         </box>
+
         <Detail
           prompt={current}
+          sources={sources}
           fav={current ? favorites.has(current.id) : false}
           width={W - listWidth}
           height={mainH}
@@ -188,33 +202,35 @@ function Header({
 }
 
 function FilterBar({
-  agent,
+  tabs,
+  active,
   model,
   showModels,
   favCount,
 }: {
-  agent: AgentTab;
+  tabs: SourceTabInfo[];
+  active: string;
   model: ModelTab;
   showModels: boolean;
   favCount: number;
 }) {
   return (
     <box style={{ flexDirection: "row", height: 1, paddingLeft: 1, paddingRight: 1 }}>
-      {AGENT_TABS.map((t) => {
-        const active = t === agent;
-        const label = t === "favorites" ? `★ Favorites(${favCount})` : AGENT_LABEL[t];
-        const color = agentColor[t] ?? T.fg;
+      {tabs.map((t) => {
+        const isActive = t.id === active;
+        const label = t.id === "favorites" ? `★ Favorites(${favCount})` : t.label;
+        const color = t.color ?? colorForSource(t.id);
         return (
           <box
-            key={t}
+            key={t.id}
             style={{
               marginRight: 1,
               paddingLeft: 1,
               paddingRight: 1,
-              backgroundColor: active ? T.bgSelected : undefined,
+              backgroundColor: isActive ? T.bgSelected : undefined,
             }}
           >
-            <text fg={active ? color : T.comment} attributes={active ? 1 : 0}>
+            <text fg={isActive ? color : T.comment} attributes={isActive ? 1 : 0}>
               {label}
             </text>
           </box>
@@ -224,7 +240,7 @@ function FilterBar({
         <box style={{ flexDirection: "row" }}>
           <text fg={T.fgGutter}>{"│ "}</text>
           {MODEL_TABS.map((m) => {
-            const active = m === model;
+            const isActive = m === model;
             return (
               <box
                 key={m}
@@ -232,10 +248,10 @@ function FilterBar({
                   marginRight: 1,
                   paddingLeft: 1,
                   paddingRight: 1,
-                  backgroundColor: active ? T.bgHighlight : undefined,
+                  backgroundColor: isActive ? T.bgHighlight : undefined,
                 }}
               >
-                <text fg={active ? T.yellow : T.comment} attributes={active ? 1 : 0}>
+                <text fg={isActive ? T.yellow : T.comment} attributes={isActive ? 1 : 0}>
                   {MODEL_LABEL[m]}
                 </text>
               </box>
@@ -249,20 +265,23 @@ function FilterBar({
 
 function Row({
   p,
+  sources,
   now,
   width,
   selected,
   fav,
 }: {
   p: Prompt;
+  sources: SourceInfo[];
   now: number;
   width: number;
   selected: boolean;
   fav: boolean;
 }) {
-  const badge = agentColor[p.agent] ?? T.fg;
+  const badge = colorForSource(p.source, sources);
   const rowMetaWidth = 16;
   const previewMax = Math.max(6, width - rowMetaWidth);
+  const sourceLabel = oneLine(p.sourceLabel || p.source, 7).padEnd(7);
   return (
     <box
       style={{
@@ -275,7 +294,7 @@ function Row({
     >
       <text fg={selected ? T.magenta : T.bg}>{selected ? "▌" : " "}</text>
       <text fg={fav ? T.yellow : T.fgGutter}>{fav ? "★" : "·"}</text>
-      <text fg={badge}>{" " + p.agent.padEnd(7)}</text>
+      <text fg={badge}>{" " + sourceLabel}</text>
       <text fg={T.comment}>{relTime(p.ts, now).padStart(4) + " "}</text>
       <text fg={selected ? T.fg : T.fgDark}>{oneLine(p.text, previewMax)}</text>
     </box>
@@ -284,11 +303,13 @@ function Row({
 
 function Detail({
   prompt,
+  sources,
   fav,
   width,
   height,
 }: {
   prompt: Prompt | undefined;
+  sources: SourceInfo[];
   fav: boolean;
   width: number;
   height: number;
@@ -300,7 +321,7 @@ function Detail({
       </box>
     );
   }
-  const badge = agentColor[prompt.agent] ?? T.fg;
+  const badge = colorForSource(prompt.source, sources);
   const bodyH = Math.max(1, height - 3);
   const innerW = Math.max(10, width - 3);
   const lines = wrapText(prompt.text, innerW).slice(0, bodyH);
@@ -308,7 +329,7 @@ function Detail({
     <box style={{ width, height, flexDirection: "column", paddingLeft: 2, paddingRight: 1 }}>
       <box style={{ flexDirection: "row", height: 1 }}>
         <text fg={badge} attributes={1}>
-          {prompt.agent.toUpperCase()}
+          {(prompt.sourceLabel || prompt.source).toUpperCase()}
         </text>
         <text fg={T.comment}>{"  ·  "}</text>
         <text fg={T.yellow}>{prompt.modelLabel}</text>
@@ -344,7 +365,7 @@ function Footer({
 }) {
   const keys = [
     "↑↓ nav",
-    "tab agent",
+    "tab source",
     showModels ? "←→ model" : "",
     "↵ favorite",
     "type search",

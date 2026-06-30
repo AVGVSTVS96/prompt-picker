@@ -1,5 +1,5 @@
-import { classifyModel } from "./model.ts";
-import { isBlank, joinTextParts, projectName, promptId, toMs } from "./util.ts";
+import { makePrompt } from "./api.ts";
+import { isBlank, joinTextParts } from "./util.ts";
 import type { Prompt } from "../types.ts";
 
 const INJECTED_PREFIXES = [
@@ -104,20 +104,20 @@ export function parsePi(file: string, raw: string): Prompt[] {
   for (const u of users) {
     const provider = u.modelId ? u.provider : latestModelChange?.provider;
     const modelId = u.modelId ?? latestModelChange?.modelId;
-    const { modelKey, modelLabel } = classifyModel(modelId, provider);
-    out.push({
-      id: promptId("pi", file, u.line, u.text),
-      agent: "pi",
-      model: modelId,
-      modelKey,
-      modelLabel,
-      text: u.text.trim(),
-      ts: toMs(u.ts),
-      cwd,
-      project: projectName(cwd),
-      sessionId,
-      file,
-    });
+    out.push(
+      makePrompt({
+        source: "pi",
+        sourceLabel: "Pi",
+        file,
+        line: u.line,
+        text: u.text,
+        ts: u.ts,
+        cwd,
+        sessionId,
+        model: modelId,
+        provider,
+      }),
+    );
   }
   return out;
 }

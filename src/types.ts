@@ -1,10 +1,23 @@
-export type Agent = "claude" | "codex" | "pi";
+export type SourceId = string;
+
+/** @deprecated Use Prompt.source instead. */
+export type Agent = SourceId;
 
 export type ModelKey = "opus-4-7" | "opus-4-8" | "gpt-5-5" | "other";
 
+export interface SourceInfo {
+  id: SourceId;
+  label: string;
+  color?: string;
+  modelFilters?: boolean;
+}
+
 export interface Prompt {
   id: string;
-  agent: Agent;
+  source: SourceId;
+  sourceLabel: string;
+  /** @deprecated Use source/sourceLabel instead. */
+  agent?: Agent;
   model?: string;
   modelKey: ModelKey;
   modelLabel: string;

@@ -1,5 +1,5 @@
-import { classifyModel } from "./model.ts";
-import { isBlank, joinTextParts, projectName, promptId, toMs } from "./util.ts";
+import { makePrompt } from "./api.ts";
+import { isBlank, joinTextParts } from "./util.ts";
 import type { Prompt } from "../types.ts";
 
 const INJECTED_PREFIXES = [
@@ -92,20 +92,21 @@ export function parseCodex(file: string, raw: string): Prompt[] {
   const out: Prompt[] = [];
   for (const u of users) {
     const model = u.model ?? sessionFallbackModel;
-    const { modelKey, modelLabel } = classifyModel(model, provider);
-    out.push({
-      id: promptId("codex", file, u.line, u.text),
-      agent: "codex",
-      model,
-      modelKey,
-      modelLabel: model ? modelLabel : "Codex",
-      text: u.text.trim(),
-      ts: toMs(u.ts),
-      cwd,
-      project: projectName(cwd),
-      sessionId,
-      file,
-    });
+    out.push(
+      makePrompt({
+        source: "codex",
+        sourceLabel: "Codex",
+        file,
+        line: u.line,
+        text: u.text,
+        ts: u.ts,
+        cwd,
+        sessionId,
+        model,
+        provider,
+        modelLabel: model ? undefined : "Codex",
+      }),
+    );
   }
   return out;
 }

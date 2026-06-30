@@ -4,17 +4,19 @@ import { absTime, oneLine, relTime, wrapText } from "../src/format.ts";
 import { search } from "../src/search.ts";
 import { classifyModel } from "../src/sources/model.ts";
 import { isBlank, joinTextParts, projectName, promptId, toMs } from "../src/sources/util.ts";
-import type { Agent, ModelKey, Prompt } from "../src/types.ts";
+import type { ModelKey, Prompt, SourceInfo } from "../src/types.ts";
 
 let seq = 0;
 
 function makePrompt(over: Partial<Prompt> = {}): Prompt {
   seq += 1;
-  const agent: Agent = over.agent ?? "claude";
+  const source = over.source ?? over.agent ?? "claude";
   const modelKey: ModelKey = over.modelKey ?? "other";
   return {
     id: over.id ?? `id-${seq}`,
-    agent,
+    source,
+    sourceLabel: over.sourceLabel ?? source,
+    agent: over.agent ?? source,
     model: over.model,
     modelKey,
     modelLabel: over.modelLabel ?? "model",
@@ -30,36 +32,45 @@ function makePrompt(over: Partial<Prompt> = {}): Prompt {
 const none = () => false;
 
 describe("filterPrompts", () => {
-  const claude = makePrompt({ agent: "claude" });
-  const codex = makePrompt({ agent: "codex" });
-  const piOpus = makePrompt({ agent: "pi", modelKey: "opus-4-8" });
-  const piGpt = makePrompt({ agent: "pi", modelKey: "gpt-5-5" });
+  const sources: SourceInfo[] = [
+    { id: "claude", label: "Claude" },
+    { id: "codex", label: "Codex" },
+    { id: "pi", label: "Pi", modelFilters: true },
+  ];
+  const claude = makePrompt({ source: "claude" });
+  const codex = makePrompt({ source: "codex" });
+  const piOpus = makePrompt({ source: "pi", modelKey: "opus-4-8" });
+  const piGpt = makePrompt({ source: "pi", modelKey: "gpt-5-5" });
   const all = [claude, codex, piOpus, piGpt];
 
   test("'all' returns everything", () => {
-    expect(filterPrompts(all, "all", "all", none)).toHaveLength(4);
+    expect(filterPrompts(all, "all", "all", none, sources)).toHaveLength(4);
   });
 
-  test("narrows to a single agent", () => {
-    expect(filterPrompts(all, "claude", "all", none)).toEqual([claude]);
+  test("narrows to a single source", () => {
+    expect(filterPrompts(all, "claude", "all", none, sources)).toEqual([claude]);
   });
 
   test("favorites tab consults the predicate", () => {
     const isFav = (id: string) => id === codex.id;
-    expect(filterPrompts(all, "favorites", "all", isFav)).toEqual([codex]);
+    expect(filterPrompts(all, "favorites", "all", isFav, sources)).toEqual([codex]);
   });
 
   test("model filter applies only on the pi tab", () => {
-    expect(filterPrompts(all, "pi", "opus-4-8", none)).toEqual([piOpus]);
-    expect(filterPrompts(all, "all", "opus-4-8", none)).toHaveLength(4);
+    expect(filterPrompts(all, "pi", "opus-4-8", none, sources)).toEqual([piOpus]);
+    expect(filterPrompts(all, "all", "opus-4-8", none, sources)).toHaveLength(4);
   });
 });
 
 describe("modelFilterActive", () => {
   test("is true only for pi", () => {
-    expect(modelFilterActive("pi")).toBe(true);
-    expect(modelFilterActive("claude")).toBe(false);
-    expect(modelFilterActive("all")).toBe(false);
+    const sources: SourceInfo[] = [
+      { id: "claude", label: "Claude" },
+      { id: "pi", label: "Pi", modelFilters: true },
+    ];
+    expect(modelFilterActive("pi", sources)).toBe(true);
+    expect(modelFilterActive("claude", sources)).toBe(false);
+    expect(modelFilterActive("all", sources)).toBe(false);
   });
 });
 

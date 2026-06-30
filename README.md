@@ -61,11 +61,102 @@ export const filters: Filter[] = [
 ];
 ```
 
-Each predicate receives a full [`Prompt`](src/types.ts) (`text`, `agent`,
+Each predicate receives a full [`Prompt`](src/types.ts) (`text`, `source`,
 `model`, `ts`, `project`, …), so you can filter on anything.
 
 Filtering runs at load time and never touches the cache, so edits take effect
 on the next launch, no reindex. A broken config is reported to stderr and otherwise ignored.
+
+## Custom sources
+
+Claude, Codex, and Pi ship as built-in sources, but they are not special — they
+use the same public API any config can use. Add your own local prompt sources
+by exporting a config **factory** from `config.ts`. The factory receives the
+source API and returns `{ filters, sources, includeBuiltins }`.
+
+`defineFileSource` scans files on disk and parses them into prompts. Use
+`makePrompt` to fill in stable ids, timestamps, project names, and model
+labels for you:
+
+```ts
+// ~/.config/prompt-picker/config.ts
+import type { ConfigApi } from "prompt-picker";
+
+export default ({ defineFileSource, makePrompt }: ConfigApi) => ({
+  sources: [
+    defineFileSource({
+      id: "cursor",
+      label: "Cursor",
+      color: "#7aa2f7",   // optional tab/badge color
+      root: "~/.cursor/chats",
+      glob: "**/*.jsonl",
+      parse({ file, raw }) {
+        return raw
+          .split("\n")
+          .flatMap((line, lineNumber) => {
+            if (!line.trim()) return [];
+            const event = JSON.parse(line);
+            if (event.role !== "user") return [];
+            return makePrompt({
+              source: "cursor",
+              file,
+              line: lineNumber,
+              text: event.content,
+              ts: event.timestamp,
+              cwd: event.cwd,
+              sessionId: event.session_id,
+              model: event.model,     // classified into a model label/key
+            });
+          });
+      },
+    }),
+  ],
+});
+```
+
+For prompts that don't come from files on disk (generated data, a SQLite
+history, an API), use `defineSource` and return the prompts directly:
+
+```ts
+import type { ConfigApi } from "prompt-picker";
+
+export default ({ defineSource, makePrompt }: ConfigApi) => ({
+  sources: [
+    defineSource({
+      id: "notes",
+      label: "Notes",
+      async load() {
+        return [
+          makePrompt({
+            source: "notes",
+            file: "manual",
+            text: "Review this architecture for accidental complexity.",
+            ts: Date.now(),
+          }),
+        ];
+      },
+    }),
+  ],
+});
+```
+
+Custom sources are merged after the built-ins and each gets its own tab. Set
+`modelFilters: true` on a source to enable the `←`/`→` model filter for it.
+Return `includeBuiltins: false` to replace the built-in sources entirely —
+useful for a demo dataset:
+
+```ts
+export default ({ defineSource, makePrompt }: ConfigApi) => {
+  const demo = Bun.argv.includes("--fake-prompts");
+  return {
+    includeBuiltins: !demo,
+    sources: demo ? [/* defineSource(...) */] : [],
+  };
+};
+```
+
+File sources are cached by size + mtime per file; `defineSource` loaders run on
+every launch. A broken source is reported to stderr and skipped.
 
 ## Performance
 
