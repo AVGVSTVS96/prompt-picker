@@ -1,19 +1,37 @@
-import { createCliRenderer } from "@opentui/core";
-import { createRoot } from "@opentui/react";
-import { App } from "./ui/App.tsx";
-import { buildIndex } from "./sources/index.ts";
-import { Favorites } from "./favorites.ts";
-import { applyConfigFilters, configuredSources, loadConfig } from "./config.ts";
+export {};
 
-const config = await loadConfig();
-const sources = configuredSources(config);
+const dataPromise = (async () => {
+  const [{ buildIndex }, { Favorites }, configMod] = await Promise.all([
+    import("./sources/index.ts"),
+    import("./favorites.ts"),
+    import("./config.ts"),
+  ]);
 
-const [indexResult, favorites] = await Promise.all([
-  buildIndex({ sources }),
-  Favorites.load(),
+  const config = await configMod.loadConfig();
+  const sources = configMod.configuredSources(config);
+
+  const [indexResult, favorites] = await Promise.all([
+    buildIndex({ sources }),
+    Favorites.load(),
+  ]);
+
+  return {
+    indexResult,
+    favorites,
+    visible: configMod.applyConfigFilters(indexResult.prompts, config.filters),
+  };
+})();
+// Rejections are surfaced at the Promise.all below; without this handler a
+// failure during the OpenTUI imports would die as an unhandled rejection.
+dataPromise.catch(() => {});
+
+const { createCliRenderer } = await import("@opentui/core");
+const { createRoot } = await import("@opentui/react");
+const [{ createElement }, { App }, data] = await Promise.all([
+  import("react"),
+  import("./ui/App.tsx"),
+  dataPromise,
 ]);
-
-const visible = applyConfigFilters(indexResult.prompts, config.filters);
 
 const renderer = await createCliRenderer({
   exitOnCtrlC: false,
@@ -29,11 +47,11 @@ function quit() {
 }
 
 root.render(
-  <App
-    prompts={visible}
-    sources={indexResult.sources}
-    favorites={favorites}
-    now={Date.now()}
-    onExit={quit}
-  />,
+  createElement(App, {
+    prompts: data.visible,
+    sources: data.indexResult.sources,
+    favorites: data.favorites,
+    now: Date.now(),
+    onExit: quit,
+  }),
 );

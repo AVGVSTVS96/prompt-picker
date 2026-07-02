@@ -59,6 +59,7 @@ export async function buildIndex(options: BuildIndexOptions = {}): Promise<Index
   let parsed = 0;
   let reused = 0;
   let scanned = 0;
+  let cacheDirty = false;
 
   const jobs: Promise<void>[] = [];
 
@@ -117,6 +118,7 @@ export async function buildIndex(options: BuildIndexOptions = {}): Promise<Index
           const parsedPrompts = await src.parse({ file, raw, source: src });
           const prompts = parsedPrompts.map((p) => applySourceDefaults(p, src));
           next[cacheKey] = { file, mtimeMs, size, prompts };
+          cacheDirty = true;
           parsed++;
           scanned++;
         })(),
@@ -125,7 +127,9 @@ export async function buildIndex(options: BuildIndexOptions = {}): Promise<Index
   }
 
   await Promise.all(jobs);
-  await saveCache(next);
+  if (cacheDirty || Object.keys(prev.entries).length !== Object.keys(next).length) {
+    await saveCache(next);
+  }
 
   const prompts: Prompt[] = [...loadedPrompts];
   for (const entry of Object.values(next)) prompts.push(...entry.prompts);

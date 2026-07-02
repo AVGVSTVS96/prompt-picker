@@ -45,6 +45,7 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
 
   const results = React.useMemo(() => {
     const base = filterPrompts(prompts, source.id, model, (id) => favorites.has(id), sources);
+    if (!query.trim()) return base;
     return search(base, query).map((s) => s.prompt);
   }, [prompts, source.id, model, query, favTick, favorites, sources]);
 

@@ -34,29 +34,13 @@ export function parseCodex(file: string, raw: string): Prompt[] {
   let cwd: string | undefined;
   let sessionId = file;
   let provider = "openai";
+  let sawSessionMeta = false;
   let sessionFallbackModel: string | undefined;
-
-  let hasEventUsers = false;
-  for (const line of lines) {
-    if (!line || isBlank(line)) continue;
-    let e: any;
-    try {
-      e = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    if (e.type === "session_meta" && e.payload) {
-      const p = e.payload;
-      if (typeof p.cwd === "string") cwd = p.cwd;
-      if (typeof p.id === "string") sessionId = p.id;
-      if (typeof p.model_provider === "string") provider = p.model_provider;
-    } else if (e.type === "event_msg" && e.payload?.type === "user_message") {
-      hasEventUsers = true;
-    }
-  }
-
-  const users: UserLine[] = [];
   let nearestTurnContextModel: string | undefined;
+  let hasEventUsers = false;
+  const eventUsers: UserLine[] = [];
+  const itemUsers: UserLine[] = [];
+
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
     if (!line || isBlank(line)) continue;
@@ -64,6 +48,15 @@ export function parseCodex(file: string, raw: string): Prompt[] {
     try {
       e = JSON.parse(line);
     } catch {
+      continue;
+    }
+
+    if (e.type === "session_meta" && e.payload && !sawSessionMeta) {
+      const p = e.payload;
+      if (typeof p.cwd === "string") cwd = p.cwd;
+      if (typeof p.id === "string") sessionId = p.id;
+      if (typeof p.model_provider === "string") provider = p.model_provider;
+      sawSessionMeta = true;
       continue;
     }
 
@@ -78,17 +71,24 @@ export function parseCodex(file: string, raw: string): Prompt[] {
     const isItemUser =
       e.type === "response_item" && p?.type === "message" && p.role === "user";
 
-    if ((hasEventUsers && isEventUser) || (!hasEventUsers && isItemUser)) {
-      const text = isEventUser
-        ? typeof p.message === "string"
-          ? p.message
-          : joinContent(p.message)
-        : joinContent(p.content);
-      if (isBlank(text) || looksInjected(text)) continue;
-      users.push({ line: i, text, ts: e.timestamp, model: nearestTurnContextModel });
+    if (isEventUser) {
+      hasEventUsers = true;
+      const text = typeof p.message === "string" ? p.message : joinContent(p.message);
+      if (!isBlank(text) && !looksInjected(text)) {
+        eventUsers.push({ line: i, text, ts: e.timestamp, model: nearestTurnContextModel });
+      }
+      continue;
+    }
+
+    if (isItemUser) {
+      const text = joinContent(p.content);
+      if (!isBlank(text) && !looksInjected(text)) {
+        itemUsers.push({ line: i, text, ts: e.timestamp, model: nearestTurnContextModel });
+      }
     }
   }
 
+  const users = hasEventUsers ? eventUsers : itemUsers;
   const out: Prompt[] = [];
   for (const u of users) {
     const model = u.model ?? sessionFallbackModel;

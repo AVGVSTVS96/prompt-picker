@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { configDir } from "./config.ts";
+import { configDir } from "./paths.ts";
 
 const FILE = join(configDir(), "favorites.json");
 
