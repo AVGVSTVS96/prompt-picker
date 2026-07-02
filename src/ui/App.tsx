@@ -2,6 +2,7 @@ import React from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import type { Prompt, SourceInfo } from "../types.ts";
 import type { Favorites } from "../favorites.ts";
+import { copyToClipboard } from "../clipboard.ts";
 import { search } from "../search.ts";
 import {
   MODEL_LABEL,
@@ -34,6 +35,13 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
   const [modelIdx, setModelIdx] = React.useState(0);
   const [selected, setSelected] = React.useState(0);
   const [favTick, setFavTick] = React.useState(0);
+  const [copiedAt, setCopiedAt] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!copiedAt) return;
+    const t = setTimeout(() => setCopiedAt(0), 1500);
+    return () => clearTimeout(t);
+  }, [copiedAt]);
 
   React.useEffect(() => {
     setSourceIdx((i) => Math.min(i, Math.max(0, tabs.length - 1)));
@@ -77,7 +85,13 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
 
   useKeyboard((k) => {
     const name = k.name;
-    if (name === "escape" || (k.ctrl && name === "c")) return onExit();
+    if (name === "escape") return onExit();
+    if (k.ctrl && name === "c") {
+      if (current) {
+        void copyToClipboard(current.text).then((ok) => ok && setCopiedAt(Date.now()));
+      }
+      return;
+    }
     if (name === "up" || (k.ctrl && name === "p")) return move(-1);
     if (name === "down" || (k.ctrl && name === "n")) return move(1);
     if (name === "pageup") return move(-(mainH - 1));
@@ -158,6 +172,7 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
         position={results.length ? selected + 1 : 0}
         count={results.length}
         showModels={showModels}
+        copied={copiedAt > 0}
         width={W}
       />
     </box>
@@ -359,17 +374,20 @@ function Footer({
   position,
   count,
   showModels,
+  copied,
   width,
 }: {
   position: number;
   count: number;
   showModels: boolean;
+  copied: boolean;
   width: number;
 }) {
   const keys = [
     "↑↓ nav",
     "tab source",
     showModels ? "←→ model" : "",
+    "^c copy",
     "↵ favorite",
     "type search",
     "esc quit",
@@ -380,6 +398,7 @@ function Footer({
       <box style={{ flexDirection: "row", height: 1, paddingLeft: 1, paddingRight: 1 }}>
         <text fg={T.comment}>{keys.join("  ·  ")}</text>
         <box style={{ flexGrow: 1 }} />
+        {copied ? <text fg={T.green}>{"copied ✓  "}</text> : null}
         <text fg={T.fgGutter}>
           {position}/{count}
         </text>
