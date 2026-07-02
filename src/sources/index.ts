@@ -52,6 +52,25 @@ export interface BuildIndexOptions {
   sources?: PromptSource[];
 }
 
+// Cap concurrent stat/read/parse jobs so a cold index over a large corpus
+// doesn't hold every file's contents in memory at once.
+const MAX_CONCURRENT_FILES = 32;
+
+function limiter(limit: number) {
+  let active = 0;
+  const queue: (() => void)[] = [];
+  return async <T>(fn: () => Promise<T>): Promise<T> => {
+    while (active >= limit) await new Promise<void>((resume) => queue.push(resume));
+    active++;
+    try {
+      return await fn();
+    } finally {
+      active--;
+      queue.shift()?.();
+    }
+  };
+}
+
 export async function buildIndex(options: BuildIndexOptions = {}): Promise<IndexResult> {
   const sources = options.sources ?? builtinSources();
   const sourceMetas = sources.map(sourceInfo);
@@ -64,6 +83,7 @@ export async function buildIndex(options: BuildIndexOptions = {}): Promise<Index
   let cacheDirty = false;
 
   const jobs: Promise<void>[] = [];
+  const limit = limiter(MAX_CONCURRENT_FILES);
 
   for (const src of sources) {
     if (src.type === "load") {
@@ -93,7 +113,7 @@ export async function buildIndex(options: BuildIndexOptions = {}): Promise<Index
     for (const file of files) {
       const cacheKey = `${src.id}:${file}`;
       jobs.push(
-        (async () => {
+        limit(async () => {
           let stat;
           try {
             stat = await Bun.file(file).stat();
@@ -123,7 +143,7 @@ export async function buildIndex(options: BuildIndexOptions = {}): Promise<Index
           cacheDirty = true;
           parsed++;
           scanned++;
-        })(),
+        }),
       );
     }
   }

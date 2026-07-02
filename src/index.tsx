@@ -55,3 +55,9 @@ root.render(
     onExit: quit,
   }),
 );
+
+if (process.env.PP_STARTUP) {
+  const ms = performance.now().toFixed(0);
+  quit();
+  process.stderr.write(`[startup] first render at ${ms}ms\n`);
+}
