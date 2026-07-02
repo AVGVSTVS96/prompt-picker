@@ -20,7 +20,7 @@ describe("parseClaude", () => {
     const out = parseClaude("/c/file.jsonl", raw);
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({
-      agent: "claude",
+      source: "claude",
       text: "real prompt",
       modelKey: "opus-4-8",
       modelLabel: "Opus 4.8",
@@ -58,7 +58,7 @@ describe("parseCodex", () => {
     const out = parseCodex("/x/file.jsonl", raw);
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({
-      agent: "codex",
+      source: "codex",
       text: "codex prompt",
       modelKey: "gpt-5-5",
       project: "app",
@@ -97,7 +97,7 @@ describe("parsePi", () => {
     const out = parsePi("/p/file.jsonl", raw);
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({
-      agent: "pi",
+      source: "pi",
       text: "pi prompt",
       modelKey: "opus-4-8",
       project: "pi-proj",

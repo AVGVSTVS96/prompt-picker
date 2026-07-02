@@ -10,13 +10,12 @@ let seq = 0;
 
 function makePrompt(over: Partial<Prompt> = {}): Prompt {
   seq += 1;
-  const source = over.source ?? over.agent ?? "claude";
+  const source = over.source ?? "claude";
   const modelKey: ModelKey = over.modelKey ?? "other";
   return {
     id: over.id ?? `id-${seq}`,
     source,
     sourceLabel: over.sourceLabel ?? source,
-    agent: over.agent ?? source,
     model: over.model,
     modelKey,
     modelLabel: over.modelLabel ?? "model",

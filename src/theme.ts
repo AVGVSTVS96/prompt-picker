@@ -26,9 +26,6 @@ export const sourceColors: Record<string, string> = {
   pi: tokyoNight.magenta,
 };
 
-/** @deprecated Use sourceColors instead. */
-export const agentColor = sourceColors;
-
 export function colorForSource(id: string, sources: SourceInfo[] = []): string {
   return sources.find((s) => s.id === id)?.color ?? sourceColors[id] ?? tokyoNight.fg;
 }

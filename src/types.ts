@@ -1,8 +1,5 @@
 export type SourceId = string;
 
-/** @deprecated Use Prompt.source instead. */
-export type Agent = SourceId;
-
 export type ModelKey = "opus-4-7" | "opus-4-8" | "gpt-5-5" | "other";
 
 export interface SourceInfo {
@@ -16,8 +13,6 @@ export interface Prompt {
   id: string;
   source: SourceId;
   sourceLabel: string;
-  /** @deprecated Use source/sourceLabel instead. */
-  agent?: Agent;
   model?: string;
   modelKey: ModelKey;
   modelLabel: string;

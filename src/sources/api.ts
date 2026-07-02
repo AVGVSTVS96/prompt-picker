@@ -33,7 +33,6 @@ export interface PromptInput {
   id?: string;
   source: string;
   sourceLabel?: string;
-  agent?: string;
   file: string;
   line?: number;
   text: string;
@@ -66,7 +65,6 @@ export function makePrompt(input: PromptInput): Prompt {
     id: input.id ?? promptId(input.source, input.file, input.line ?? 0, text),
     source: input.source,
     sourceLabel,
-    agent: input.agent ?? input.source,
     model: input.model,
     modelKey,
     modelLabel,
@@ -90,6 +88,5 @@ export function applySourceDefaults(prompt: Prompt, source: SourceInfo): Prompt 
     ...prompt,
     source: sourceId,
     sourceLabel: prompt.sourceLabel || source.label,
-    agent: prompt.agent ?? sourceId,
   };
 }

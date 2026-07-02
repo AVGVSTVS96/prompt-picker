@@ -1,7 +1,6 @@
 import type { ModelKey, Prompt, SourceInfo } from "./types.ts";
 
 export type SourceTab = "all" | "favorites" | string;
-export type AgentTab = SourceTab;
 export type ModelTab = "all" | "opus-4-8" | "opus-4-7" | "gpt-5-5";
 
 export interface SourceTabInfo {
