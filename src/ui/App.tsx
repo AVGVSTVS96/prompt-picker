@@ -86,7 +86,7 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
   useKeyboard((k) => {
     const name = k.name;
     if (name === "escape") return onExit();
-    if (k.ctrl && name === "c") {
+    if ((k.meta || k.super) && name === "c") {
       if (current) {
         void copyToClipboard(current.text).then((ok) => ok && setCopiedAt(Date.now()));
       }
@@ -424,10 +424,10 @@ function Footer({
     "↑↓ nav",
     "tab source",
     showModels ? "←→ model" : "",
-    "^c copy",
+    "⌘c copy",
     "↵ favorite",
     "type search",
-    "esc quit",
+    "esc/^c quit",
   ].filter(Boolean);
   return (
     <box style={{ flexDirection: "column", width, height: 2 }}>

@@ -34,9 +34,11 @@ const [{ createElement }, { App }, data] = await Promise.all([
 ]);
 
 const renderer = await createCliRenderer({
-  exitOnCtrlC: false,
+  exitOnCtrlC: true,
   useMouse: false,
-  targetFps: 30,
+  // No console overlay: leave global console.log/error unpatched.
+  consoleMode: "disabled",
+  openConsoleOnError: false,
 });
 
 const root = createRoot(renderer);
