@@ -3,7 +3,7 @@ import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import type { Prompt, SourceInfo } from "../types.ts";
 import type { Favorites } from "../favorites.ts";
 import { copyToClipboard } from "../clipboard.ts";
-import { search } from "../search.ts";
+import { matchRanges, search } from "../search.ts";
 import {
   MODEL_LABEL,
   MODEL_TABS,
@@ -152,6 +152,7 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
                 p={p}
                 sources={sources}
                 now={now}
+                query={query}
                 width={listWidth - 1}
                 selected={scrollStart + i === selected}
                 fav={favorites.has(p.id)}
@@ -164,6 +165,7 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
           prompt={current}
           sources={sources}
           fav={current ? favorites.has(current.id) : false}
+          query={query}
           width={W - listWidth}
           height={mainH}
         />
@@ -177,6 +179,36 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
       />
     </box>
   );
+}
+
+function Highlight({ text, query, fg }: { text: string; query: string; fg: string }) {
+  const ranges = query ? matchRanges(text, query) : [];
+  if (ranges.length === 0) return <text fg={fg}>{text}</text>;
+  const parts: React.ReactNode[] = [];
+  let pos = 0;
+  ranges.forEach(([start, end], i) => {
+    if (start > pos) {
+      parts.push(
+        <text key={`t${i}`} fg={fg}>
+          {text.slice(pos, start)}
+        </text>,
+      );
+    }
+    parts.push(
+      <text key={`m${i}`} fg={T.yellow} attributes={1}>
+        {text.slice(start, end)}
+      </text>,
+    );
+    pos = end;
+  });
+  if (pos < text.length) {
+    parts.push(
+      <text key="tail" fg={fg}>
+        {text.slice(pos)}
+      </text>,
+    );
+  }
+  return <>{parts}</>;
 }
 
 function Rule({ width, color = T.border }: { width: number; color?: string }) {
@@ -283,6 +315,7 @@ function Row({
   p,
   sources,
   now,
+  query,
   width,
   selected,
   fav,
@@ -290,6 +323,7 @@ function Row({
   p: Prompt;
   sources: SourceInfo[];
   now: number;
+  query: string;
   width: number;
   selected: boolean;
   fav: boolean;
@@ -297,6 +331,7 @@ function Row({
   const badge = colorForSource(p.source, sources);
   const rowMetaWidth = 16;
   const previewMax = Math.max(6, width - rowMetaWidth);
+  const preview = oneLine(p.text.slice(0, previewMax * 4), previewMax);
   const sourceLabel = oneLine(p.sourceLabel || p.source, 7).padEnd(7);
   return (
     <box
@@ -312,7 +347,7 @@ function Row({
       <text fg={fav ? T.yellow : T.fgGutter}>{fav ? "★" : "·"}</text>
       <text fg={badge}>{" " + sourceLabel}</text>
       <text fg={T.comment}>{relTime(p.ts, now).padStart(4) + " "}</text>
-      <text fg={selected ? T.fg : T.fgDark}>{oneLine(p.text, previewMax)}</text>
+      <Highlight text={preview} query={query} fg={selected ? T.fg : T.fgDark} />
     </box>
   );
 }
@@ -321,12 +356,14 @@ function Detail({
   prompt,
   sources,
   fav,
+  query,
   width,
   height,
 }: {
   prompt: Prompt | undefined;
   sources: SourceInfo[];
   fav: boolean;
+  query: string;
   width: number;
   height: number;
 }) {
@@ -340,7 +377,7 @@ function Detail({
   const badge = colorForSource(prompt.source, sources);
   const bodyH = Math.max(1, height - 3);
   const innerW = Math.max(10, width - 3);
-  const lines = wrapText(prompt.text, innerW).slice(0, bodyH);
+  const lines = wrapText(prompt.text.slice(0, innerW * bodyH * 4), innerW).slice(0, bodyH);
   return (
     <box style={{ width, height, flexDirection: "column", paddingLeft: 2, paddingRight: 1 }}>
       <box style={{ flexDirection: "row", height: 1 }}>
@@ -361,9 +398,9 @@ function Detail({
       <box style={{ height: 1 }} />
       <box style={{ flexDirection: "column", height: bodyH, width: innerW, overflow: "hidden" }}>
         {lines.map((ln, i) => (
-          <text key={i} fg={T.fg}>
-            {ln || " "}
-          </text>
+          <box key={i} style={{ flexDirection: "row", height: 1, overflow: "hidden" }}>
+            <Highlight text={ln || " "} query={query} fg={T.fg} />
+          </box>
         ))}
       </box>
     </box>

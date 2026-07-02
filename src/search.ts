@@ -47,3 +47,39 @@ export function search(prompts: Prompt[], query: string): Scored[] {
   results.sort((a, b) => b.score - a.score || b.prompt.ts - a.prompt.ts);
   return results;
 }
+
+export type MatchRange = [start: number, end: number];
+
+/**
+ * Ranges of `text` matched by `query` (case-insensitive), mirroring search():
+ * occurrences of the full phrase when it appears, otherwise occurrences of
+ * each term, merged where they overlap.
+ */
+export function matchRanges(text: string, query: string): MatchRange[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
+  const haystack = text.toLowerCase();
+
+  const pushAll = (term: string, out: MatchRange[]) => {
+    for (let at = haystack.indexOf(term); at !== -1; at = haystack.indexOf(term, at + term.length)) {
+      out.push([at, at + term.length]);
+    }
+  };
+
+  const ranges: MatchRange[] = [];
+  pushAll(normalizedQuery, ranges);
+  if (ranges.length === 0) {
+    for (const term of normalizedQuery.split(/\s+/)) pushAll(term, ranges);
+  }
+  if (ranges.length <= 1) return ranges;
+
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged: MatchRange[] = [ranges[0]];
+  for (let i = 1; i < ranges.length; i++) {
+    const range = ranges[i];
+    const last = merged[merged.length - 1];
+    if (range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+    else merged.push(range);
+  }
+  return merged;
+}

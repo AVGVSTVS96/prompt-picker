@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { filterPrompts, modelFilterActive } from "../src/filter.ts";
 import { absTime, oneLine, relTime, wrapText } from "../src/format.ts";
-import { search } from "../src/search.ts";
+import { matchRanges, search } from "../src/search.ts";
 import { classifyModel } from "../src/sources/model.ts";
 import { isBlank, joinTextParts, projectName, promptId, toMs } from "../src/sources/util.ts";
 import type { ModelKey, Prompt, SourceInfo } from "../src/types.ts";
@@ -144,6 +144,29 @@ describe("search", () => {
     const older = makePrompt({ text: "deploy now", ts: 100 });
     const newer = makePrompt({ text: "deploy now", ts: 200 });
     expect(search([older, newer], "deploy now")[0].prompt).toBe(newer);
+  });
+});
+
+describe("matchRanges", () => {
+  test("returns nothing for empty queries or no match", () => {
+    expect(matchRanges("anything", "  ")).toEqual([]);
+    expect(matchRanges("anything", "zzz")).toEqual([]);
+  });
+
+  test("prefers whole-phrase occurrences, case-insensitively", () => {
+    expect(matchRanges("Pod bay, pod bay", "pod bay")).toEqual([
+      [0, 7],
+      [9, 16],
+    ]);
+  });
+
+  test("falls back to per-term ranges and merges overlaps", () => {
+    // "abc" and "cde" never appear adjacently, so terms match separately
+    // and their overlapping hits in "abcde" merge into one range.
+    expect(matchRanges("abcde xx abc", "abc cde")).toEqual([
+      [0, 5],
+      [9, 12],
+    ]);
   });
 });
 
