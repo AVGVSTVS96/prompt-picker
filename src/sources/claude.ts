@@ -16,6 +16,8 @@ const INJECTED_PREFIXES = [
   "<system-reminder>",
   "<user-memory-input>",
   "Caveat: The messages below",
+  "[Request interrupted",
+  "This session is being continued",
 ];
 
 function looksInjected(text: string): boolean {

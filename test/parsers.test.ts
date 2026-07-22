@@ -35,6 +35,9 @@ describe("parseClaude", () => {
       { type: "user", isMeta: true, message: { content: "meta noise" } },
       { type: "user", message: { content: [{ type: "tool_result", text: "result" }] } },
       { type: "user", message: { content: "   " } },
+      { type: "user", message: { content: "[Request interrupted by user]" } },
+      { type: "user", message: { content: "[Request interrupted by user for tool use]" } },
+      { type: "user", message: { content: "This session is being continued from a previous conversation that ran out of context…" } },
       { type: "user", message: { content: "kept" } },
     );
     const out = parseClaude("/c/file.jsonl", raw);
