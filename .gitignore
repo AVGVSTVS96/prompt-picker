@@ -24,3 +24,5 @@ out/
 # temporary files
 *.tmp
 *.temp
+demo/config/prompt-picker/favorites.json
+demo/config/prompt-picker/index-cache.json
