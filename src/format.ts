@@ -1,3 +1,7 @@
+import { basename, extname } from "node:path";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export function relTime(ts: number, now: number): string {
   if (!ts) return "—";
   const s = Math.max(0, Math.floor((now - ts) / 1000));
@@ -25,6 +29,20 @@ export function absTime(ts: number): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** "Jul 21 14:32" — month day, 24h clock, no year. Fixed month names so output is locale-independent. */
+export function shortTime(ts: number): string {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${MONTHS[d.getMonth()]} ${d.getDate()} ${hh}:${mm}`;
+}
+
+/** Session id for display; falls back to the file basename (no ext) when sessionId is a path. */
+export function sessionLabel(sessionId: string): string {
+  return basename(sessionId, extname(sessionId));
 }
 
 export function oneLine(text: string, max: number): string {

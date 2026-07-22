@@ -50,6 +50,56 @@ bun start
 > the first 3 they fold behind an `Other` chip — `Enter` on it opens a
 > searchable picker of every model in the view.
 
+## CLI
+
+`pp` on a real terminal launches the TUI. Piped or redirected (how LLMs run
+it), it lists recent prompts and exits — built for agents to grep/read
+without spending context on a UI. Any positional args, or an explicit `ls`,
+also force list mode.
+
+```bash
+pp                          # TTY: TUI · piped: same as `pp ls`
+pp fix the flaky test       # search
+pp ls -s 24h                # last day, newest first
+pp ls -s 3                  # bare number = days, same as -s 3d
+pp ls --source codex        # one source
+pp ls -m opus                # model filter, see rule below
+pp ls --json --since 1w > out.jsonl
+pp ls -s 1 -c                # compact headers
+```
+
+Flags: `--since`/`-s <n>h|d|w|<n>` (default `3d`; a bare number means days —
+`-s 3` ≡ `-s 3d`), `--source <id>`, `--model`/`-m <q>`, `--json` (JSONL, one
+`Prompt` per line), `--raw` (skip config filters — custom sources still
+load), `--compact`/`-c` (session id only, no `--json`), `--agents` (include
+prompts written by agents and apps — subagent transcripts, SDK-driven
+sessions — hidden by default and marked `agent` in the header). Results are
+capped at 100, newest/most-relevant first.
+
+Each prompt is printed under a one-line header:
+
+```
+── claude · Fable 5 · prompt-picker · Jul 21 14:32 · 019f4aec-4067-426b-95da-05acbc07b563
+prompt text...
+```
+
+`source · model · project · short date/time · session id`. The model is
+omitted when `-m`/`--model` narrowed the results (redundant at that point).
+`--compact` shrinks the header to just the session id, prefixed with the
+source unless `--source` was already given:
+
+```
+── claude · 019f4aec-4067-426b-95da-05acbc07b563   # default compact
+── 019f4aec-4067-426b-95da-05acbc07b563            # --source claude -c
+```
+
+`--model` matches substrings of the model label (`-`, `.`, and space are
+interchangeable, so `opus-4.7` and `opus 4.7` are the same query). A query
+with no digits keeps only the highest matching version — `-m gpt` picks the
+newest GPT release, not every one you've ever used.
+
+Config filters (see below) apply by default; `--raw` skips them.
+
 ## Custom filters
 
 Drop a `config.ts` in `~/.config/prompt-picker/` to use custom filters.
