@@ -1,12 +1,9 @@
 export type SourceId = string;
 
-export type ModelKey = "opus-4-7" | "opus-4-8" | "gpt-5-5" | "other";
-
 export interface SourceInfo {
   id: SourceId;
   label: string;
   color?: string;
-  modelFilters?: boolean;
 }
 
 export interface Prompt {
@@ -14,7 +11,6 @@ export interface Prompt {
   source: SourceId;
   sourceLabel: string;
   model?: string;
-  modelKey: ModelKey;
   modelLabel: string;
   text: string;
   ts: number;

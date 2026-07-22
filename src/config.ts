@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { configDir } from "./paths.ts";
 import { builtinSources } from "./sources/builtins.ts";
-import { classifyModel } from "./sources/model.ts";
+import { labelModel } from "./sources/model.ts";
 import {
   defineFileSource,
   defineSource,
@@ -13,7 +13,7 @@ import {
 } from "./sources/api.ts";
 import type { Prompt } from "./types.ts";
 
-export type { Prompt, SourceInfo, ModelKey } from "./types.ts";
+export type { Prompt, SourceInfo } from "./types.ts";
 export type {
   FileParseInput,
   FilePromptSource,
@@ -24,7 +24,7 @@ export type {
   PromptSource,
   SourceLoadInput,
 } from "./sources/api.ts";
-export { builtinSources, classifyModel, configDir, defineFileSource, defineSource, makePrompt };
+export { builtinSources, labelModel, configDir, defineFileSource, defineSource, makePrompt };
 
 export type Filter = (prompt: Prompt) => boolean;
 
@@ -38,7 +38,7 @@ export interface ConfigApi {
   defineFileSource: typeof defineFileSource;
   defineSource: typeof defineSource;
   makePrompt: typeof makePrompt;
-  classifyModel: typeof classifyModel;
+  labelModel: typeof labelModel;
   builtinSources: typeof builtinSources;
 }
 
@@ -58,7 +58,7 @@ const configApi: ConfigApi = {
   defineFileSource,
   defineSource,
   makePrompt,
-  classifyModel,
+  labelModel,
   builtinSources,
 };
 

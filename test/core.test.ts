@@ -1,23 +1,21 @@
 import { describe, expect, test } from "bun:test";
-import { filterPrompts, modelFilterActive } from "../src/filter.ts";
+import { filterPrompts, modelTabs } from "../src/filter.ts";
 import { absTime, oneLine, relTime, wrapText } from "../src/format.ts";
 import { matchRanges, search } from "../src/search.ts";
-import { classifyModel } from "../src/sources/model.ts";
+import { labelModel } from "../src/sources/model.ts";
 import { isBlank, joinTextParts, projectName, promptId, toMs } from "../src/sources/util.ts";
-import type { ModelKey, Prompt, SourceInfo } from "../src/types.ts";
+import type { Prompt } from "../src/types.ts";
 
 let seq = 0;
 
 function makePrompt(over: Partial<Prompt> = {}): Prompt {
   seq += 1;
   const source = over.source ?? "claude";
-  const modelKey: ModelKey = over.modelKey ?? "other";
   return {
     id: over.id ?? `id-${seq}`,
     source,
     sourceLabel: over.sourceLabel ?? source,
     model: over.model,
-    modelKey,
     modelLabel: over.modelLabel ?? "model",
     text: over.text ?? "prompt text",
     ts: over.ts ?? seq,
@@ -31,45 +29,48 @@ function makePrompt(over: Partial<Prompt> = {}): Prompt {
 const none = () => false;
 
 describe("filterPrompts", () => {
-  const sources: SourceInfo[] = [
-    { id: "claude", label: "Claude" },
-    { id: "codex", label: "Codex" },
-    { id: "pi", label: "Pi", modelFilters: true },
-  ];
-  const claude = makePrompt({ source: "claude" });
-  const codex = makePrompt({ source: "codex" });
-  const piOpus = makePrompt({ source: "pi", modelKey: "opus-4-8" });
-  const piGpt = makePrompt({ source: "pi", modelKey: "gpt-5-5" });
+  const claude = makePrompt({ source: "claude", modelLabel: "Claude" });
+  const codex = makePrompt({ source: "codex", modelLabel: "GPT-5.5" });
+  const piOpus = makePrompt({ source: "pi", modelLabel: "Opus 4.8" });
+  const piGpt = makePrompt({ source: "pi", modelLabel: "GPT-5.5" });
   const all = [claude, codex, piOpus, piGpt];
 
   test("'all' returns everything", () => {
-    expect(filterPrompts(all, "all", "all", none, sources)).toHaveLength(4);
+    expect(filterPrompts(all, "all", null, none)).toHaveLength(4);
   });
 
   test("narrows to a single source", () => {
-    expect(filterPrompts(all, "claude", "all", none, sources)).toEqual([claude]);
+    expect(filterPrompts(all, "claude", null, none)).toEqual([claude]);
   });
 
   test("favorites tab consults the predicate", () => {
     const isFav = (id: string) => id === codex.id;
-    expect(filterPrompts(all, "favorites", "all", isFav, sources)).toEqual([codex]);
+    expect(filterPrompts(all, "favorites", null, isFav)).toEqual([codex]);
   });
 
-  test("model filter applies only on the pi tab", () => {
-    expect(filterPrompts(all, "pi", "opus-4-8", none, sources)).toEqual([piOpus]);
-    expect(filterPrompts(all, "all", "opus-4-8", none, sources)).toHaveLength(4);
+  test("model filter narrows by label across sources", () => {
+    expect(filterPrompts(all, "all", "GPT-5.5", none)).toEqual([codex, piGpt]);
+  });
+
+  test("model and source filters combine", () => {
+    expect(filterPrompts(all, "pi", "Opus 4.8", none)).toEqual([piOpus]);
   });
 });
 
-describe("modelFilterActive", () => {
-  test("is true only for pi", () => {
-    const sources: SourceInfo[] = [
-      { id: "claude", label: "Claude" },
-      { id: "pi", label: "Pi", modelFilters: true },
+describe("modelTabs", () => {
+  test("orders distinct labels by most recent prompt, not by count", () => {
+    const prompts = [
+      makePrompt({ modelLabel: "Opus 4.8", ts: 1 }),
+      makePrompt({ modelLabel: "Opus 4.8", ts: 2 }),
+      makePrompt({ modelLabel: "Opus 4.8", ts: 3 }),
+      makePrompt({ modelLabel: "GPT-5.5", ts: 4 }),
     ];
-    expect(modelFilterActive("pi", sources)).toBe(true);
-    expect(modelFilterActive("claude", sources)).toBe(false);
-    expect(modelFilterActive("all", sources)).toBe(false);
+    expect(modelTabs(prompts)).toEqual(["GPT-5.5", "Opus 4.8"]);
+  });
+
+  test("a single distinct label yields a one-element list", () => {
+    const prompts = [makePrompt({ modelLabel: "Opus 4.8" }), makePrompt({ modelLabel: "Opus 4.8" })];
+    expect(modelTabs(prompts)).toHaveLength(1);
   });
 });
 
@@ -106,19 +107,33 @@ describe("format helpers", () => {
   });
 });
 
-describe("classifyModel", () => {
-  test("recognizes pinned and unknown model ids", () => {
-    expect(classifyModel("claude-opus-4-8-20991231")).toMatchObject({ modelKey: "opus-4-8", modelLabel: "Opus 4.8" });
-    expect(classifyModel("opus4.7")).toMatchObject({ modelKey: "opus-4-7" });
-    expect(classifyModel("gpt-5.5")).toMatchObject({ modelKey: "gpt-5-5", modelLabel: "GPT-5.5" });
-    expect(classifyModel(undefined, "anthropic")).toEqual({ modelKey: "other", modelLabel: "Anthropic" });
-    expect(classifyModel(undefined)).toEqual({ modelKey: "other", modelLabel: "Unknown" });
+describe("labelModel", () => {
+  test("Claude family: single- and double-digit versions, provider-prefixed", () => {
+    expect(labelModel("claude-fable-5")).toBe("Fable 5");
+    expect(labelModel("claude-sonnet-5")).toBe("Sonnet 5");
+    expect(labelModel("claude-opus-4-8")).toBe("Opus 4.8");
+    expect(labelModel("anthropic/claude-opus-4-7")).toBe("Opus 4.7");
+    expect(labelModel("claude-sonnet-4-6")).toBe("Sonnet 4.6");
   });
 
-  test("prettifies known families and passes unknown ids through", () => {
-    expect(classifyModel("claude-sonnet-4-5")).toMatchObject({ modelKey: "other", modelLabel: "Sonnet 4.5" });
-    expect(classifyModel("openai/gpt-4o")).toMatchObject({ modelLabel: "GPT-4o" });
-    expect(classifyModel("llama-3-70b")).toMatchObject({ modelLabel: "llama-3-70b" });
+  test("GPT family unifies across provider prefixes and keeps suffix words", () => {
+    expect(labelModel("gpt-5.5")).toBe("GPT-5.5");
+    expect(labelModel("openai/gpt-5.5")).toBe("GPT-5.5");
+    expect(labelModel("openai-codex/gpt-5.5")).toBe("GPT-5.5");
+    expect(labelModel("gpt-5.6-sol")).toBe("GPT-5.6 Sol");
+    expect(labelModel("gpt-5.6-luna-pro")).toBe("GPT-5.6 Luna Pro");
+    expect(labelModel("gpt-5.3-codex-spark")).toBe("GPT-5.3 Codex Spark");
+    expect(labelModel("gpt-5-codex")).toBe("GPT-5 Codex");
+  });
+
+  test("other providers: title-cased, every word kept", () => {
+    expect(labelModel("moonshotai/kimi-k2.7-code")).toBe("Kimi K2.7 Code");
+    expect(labelModel("deepseek/deepseek-v4-flash")).toBe("DeepSeek V4 Flash");
+  });
+
+  test("falls back to provider or 'Unknown' when no model id is known", () => {
+    expect(labelModel(undefined, "anthropic")).toBe("Anthropic");
+    expect(labelModel(undefined)).toBe("Unknown");
   });
 });
 

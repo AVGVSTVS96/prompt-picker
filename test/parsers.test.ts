@@ -22,7 +22,6 @@ describe("parseClaude", () => {
     expect(out[0]).toMatchObject({
       source: "claude",
       text: "real prompt",
-      modelKey: "opus-4-8",
       modelLabel: "Opus 4.8",
       project: "proj",
       sessionId: "s1",
@@ -60,7 +59,7 @@ describe("parseCodex", () => {
     expect(out[0]).toMatchObject({
       source: "codex",
       text: "codex prompt",
-      modelKey: "gpt-5-5",
+      modelLabel: "GPT-5.5",
       project: "app",
       sessionId: "sess",
     });
@@ -99,7 +98,7 @@ describe("parsePi", () => {
     expect(out[0]).toMatchObject({
       source: "pi",
       text: "pi prompt",
-      modelKey: "opus-4-8",
+      modelLabel: "Opus 4.8",
       project: "pi-proj",
       sessionId: "ps",
       ts: 1_700_000_000_000,

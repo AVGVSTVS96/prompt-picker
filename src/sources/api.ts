@@ -1,6 +1,6 @@
-import { classifyModel } from "./model.ts";
+import { labelModel } from "./model.ts";
 import { projectName, promptId, toMs } from "./util.ts";
-import type { ModelKey, Prompt, SourceInfo } from "../types.ts";
+import type { Prompt, SourceInfo } from "../types.ts";
 
 export interface FileParseInput {
   file: string;
@@ -42,7 +42,6 @@ export interface PromptInput {
   sessionId?: string;
   model?: string;
   provider?: string;
-  modelKey?: ModelKey;
   modelLabel?: string;
 }
 
@@ -55,9 +54,7 @@ export function defineSource(input: LoadPromptSourceInput): LoadPromptSource {
 }
 
 export function makePrompt(input: PromptInput): Prompt {
-  const classified = classifyModel(input.model, input.provider);
-  const modelKey = input.modelKey ?? classified.modelKey;
-  const modelLabel = input.modelLabel ?? classified.modelLabel;
+  const modelLabel = input.modelLabel ?? labelModel(input.model, input.provider);
   const sourceLabel = input.sourceLabel ?? input.source;
   const text = input.text.trim();
 
@@ -66,7 +63,6 @@ export function makePrompt(input: PromptInput): Prompt {
     source: input.source,
     sourceLabel,
     model: input.model,
-    modelKey,
     modelLabel,
     text,
     ts: toMs(input.ts),
@@ -78,8 +74,8 @@ export function makePrompt(input: PromptInput): Prompt {
 }
 
 export function sourceInfo(source: PromptSource): SourceInfo {
-  const { id, label, color, modelFilters } = source;
-  return { id, label, color, modelFilters };
+  const { id, label, color } = source;
+  return { id, label, color };
 }
 
 export function applySourceDefaults(prompt: Prompt, source: SourceInfo): Prompt {

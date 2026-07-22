@@ -27,7 +27,6 @@ export function builtinSources(home = homedir()): PromptSource[] {
       id: "pi",
       label: "Pi",
       color: "#bb9af7",
-      modelFilters: true,
       root: join(home, ".pi", "agent", "sessions"),
       glob: "*/*.jsonl",
       parse: ({ file, raw }) => parsePi(file, raw),

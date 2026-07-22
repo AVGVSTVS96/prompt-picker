@@ -4,17 +4,10 @@ import type { Prompt, SourceInfo } from "../types.ts";
 import type { Favorites } from "../favorites.ts";
 import { copyToClipboard } from "../clipboard.ts";
 import { matchRanges, search } from "../search.ts";
-import {
-  MODEL_LABEL,
-  MODEL_TABS,
-  filterPrompts,
-  modelFilterActive,
-  sourceTabs,
-  type ModelTab,
-  type SourceTabInfo,
-} from "../filter.ts";
+import { INLINE_MODEL_TABS, filterPrompts, modelTabs, sourceTabs, type SourceTabInfo } from "../filter.ts";
 import { tokyoNight as T, colorForSource } from "../theme.ts";
 import { absTime, oneLine, relTime, wrapText } from "../format.ts";
+import { SearchInput } from "./SearchInput.tsx";
 
 interface Props {
   prompts: Prompt[];
@@ -33,6 +26,10 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
   const [query, setQuery] = React.useState("");
   const [sourceIdx, setSourceIdx] = React.useState(0);
   const [modelIdx, setModelIdx] = React.useState(0);
+  const [picked, setPicked] = React.useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [pickerQuery, setPickerQuery] = React.useState("");
+  const [pickerIdx, setPickerIdx] = React.useState(0);
   const [selected, setSelected] = React.useState(0);
   const [favTick, setFavTick] = React.useState(0);
   const [copiedAt, setCopiedAt] = React.useState(0);
@@ -48,14 +45,52 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
   }, [tabs.length]);
 
   const source = tabs[sourceIdx] ?? tabs[0];
-  const model: ModelTab = MODEL_TABS[modelIdx];
-  const showModels = modelFilterActive(source.id, sources);
+
+  const models = React.useMemo(
+    () => modelTabs(filterPrompts(prompts, source.id, null, (id) => favorites.has(id))),
+    [prompts, source.id, favTick, favorites],
+  );
+  const options: (string | null)[] = [null, ...models];
+  const showModels = models.length >= 2;
+  const fold = options.length > INLINE_MODEL_TABS + 2;
+  const inline = fold ? options.slice(0, 1 + INLINE_MODEL_TABS) : options;
+  // With a fold, the Other chip is one extra stop in the ←/→ cycle.
+  const stops = inline.length + (fold ? 1 : 0);
+  const onOther = fold && modelIdx === inline.length;
+  const model = showModels ? (onOther ? picked : (inline[modelIdx] ?? null)) : null;
+
+  React.useEffect(() => {
+    setModelIdx((i) => Math.min(i, Math.max(0, stops - 1)));
+  }, [stops]);
+
+  const pickerLabels = React.useMemo(
+    () => models.filter((m) => m.toLowerCase().includes(pickerQuery.toLowerCase())),
+    [models, pickerQuery],
+  );
+
+  function closePicker() {
+    setPickerOpen(false);
+    setPickerQuery("");
+    setPickerIdx(0);
+  }
+
+  function applyModel(label: string) {
+    const i = inline.indexOf(label);
+    if (i >= 0) {
+      setModelIdx(i);
+      setPicked(null);
+    } else {
+      setModelIdx(inline.length);
+      setPicked(label);
+    }
+    closePicker();
+  }
 
   const results = React.useMemo(() => {
-    const base = filterPrompts(prompts, source.id, model, (id) => favorites.has(id), sources);
+    const base = filterPrompts(prompts, source.id, model, (id) => favorites.has(id));
     if (!query.trim()) return base;
     return search(base, query).map((s) => s.prompt);
-  }, [prompts, source.id, model, query, favTick, favorites, sources]);
+  }, [prompts, source.id, model, query, favTick, favorites]);
 
   React.useEffect(() => {
     setSelected(0);
@@ -85,6 +120,30 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
 
   useKeyboard((k) => {
     const name = k.name;
+    if (pickerOpen) {
+      if (name === "escape") return closePicker();
+      if (name === "up" || (k.ctrl && name === "p")) return setPickerIdx((i) => Math.max(0, i - 1));
+      if (name === "down" || (k.ctrl && name === "n"))
+        return setPickerIdx((i) => Math.min(Math.max(0, pickerLabels.length - 1), i + 1));
+      if (name === "return") {
+        const label = pickerLabels[pickerIdx];
+        if (label) applyModel(label);
+        return;
+      }
+      if (k.ctrl && name === "u") {
+        setPickerQuery("");
+        return setPickerIdx(0);
+      }
+      if (name === "backspace") {
+        setPickerQuery((q) => q.slice(0, -1));
+        return setPickerIdx(0);
+      }
+      if (!k.ctrl && !k.meta && k.sequence?.length === 1 && k.sequence >= " " && k.sequence !== "\x7f") {
+        setPickerQuery((q) => q + k.sequence);
+        setPickerIdx(0);
+      }
+      return;
+    }
     if (name === "escape") return onExit();
     if ((k.meta || k.super) && name === "c") {
       if (current) {
@@ -101,11 +160,12 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
       const dir = k.shift ? -1 : 1;
       setSourceIdx((i) => (i + dir + tabs.length) % tabs.length);
       setModelIdx(0);
+      setPicked(null);
       return;
     }
-    if (showModels && name === "right") return setModelIdx((i) => (i + 1) % MODEL_TABS.length);
-    if (showModels && name === "left")
-      return setModelIdx((i) => (i - 1 + MODEL_TABS.length) % MODEL_TABS.length);
+    if (showModels && name === "right") return setModelIdx((i) => (i + 1) % stops);
+    if (showModels && name === "left") return setModelIdx((i) => (i - 1 + stops) % stops);
+    if (name === "return" && onOther) return setPickerOpen(true);
     if (name === "return" || (k.ctrl && name === "s")) {
       if (current) {
         favorites.toggle(current.id);
@@ -126,7 +186,10 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
       <FilterBar
         tabs={tabs}
         active={source.id}
-        model={model}
+        inline={inline}
+        modelIdx={modelIdx}
+        showOther={fold}
+        picked={picked}
         showModels={showModels}
         favCount={favorites.size}
       />
@@ -174,9 +237,22 @@ export function App({ prompts, sources, favorites, now, onExit }: Props) {
         position={results.length ? selected + 1 : 0}
         count={results.length}
         showModels={showModels}
+        pickerOpen={pickerOpen}
+        onOther={onOther}
         copied={copiedAt > 0}
         width={W}
       />
+      {pickerOpen && (
+        <ModelPicker
+          labels={pickerLabels}
+          total={models.length}
+          maxLabel={Math.max(...models.map((m) => m.length))}
+          query={pickerQuery}
+          selected={pickerIdx}
+          screenW={W}
+          screenH={H}
+        />
+      )}
     </box>
   );
 }
@@ -234,12 +310,9 @@ function Header({
     <box style={{ flexDirection: "column", width, height: 2 }}>
       <box style={{ flexDirection: "row", height: 1, paddingLeft: 1, paddingRight: 1 }}>
         <text fg={T.magenta} attributes={1}>
-          prompt-picker
+          {"prompt-picker   "}
         </text>
-        <text fg={T.cyan}>{"   ⌕ "}</text>
-        <box style={{ flexGrow: 1 }}>
-          <text fg={query ? T.fg : T.comment}>{query || "type to search prompts…"}</text>
-        </box>
+        <SearchInput query={query} placeholder="type to search prompts…" />
         <text fg={T.comment}>
           {count}/{total}
         </text>
@@ -249,63 +322,144 @@ function Header({
   );
 }
 
+function Chip({
+  label,
+  active,
+  color = T.yellow,
+  activeBg = T.bgHighlight,
+}: {
+  label: string;
+  active: boolean;
+  color?: string;
+  activeBg?: string;
+}) {
+  return (
+    <box
+      style={{ marginRight: 1, paddingLeft: 1, paddingRight: 1, backgroundColor: active ? activeBg : undefined }}
+    >
+      <text fg={active ? color : T.comment} attributes={active ? 1 : 0}>
+        {label}
+      </text>
+    </box>
+  );
+}
+
 function FilterBar({
   tabs,
   active,
-  model,
+  inline,
+  modelIdx,
+  showOther,
+  picked,
   showModels,
   favCount,
 }: {
   tabs: SourceTabInfo[];
   active: string;
-  model: ModelTab;
+  inline: (string | null)[];
+  modelIdx: number;
+  showOther: boolean;
+  picked: string | null;
   showModels: boolean;
   favCount: number;
 }) {
   return (
     <box style={{ flexDirection: "row", height: 1, paddingLeft: 1, paddingRight: 1 }}>
-      {tabs.map((t) => {
-        const isActive = t.id === active;
-        const label = t.id === "favorites" ? `★ Favorites(${favCount})` : t.label;
-        const color = t.color ?? colorForSource(t.id);
-        return (
-          <box
-            key={t.id}
-            style={{
-              marginRight: 1,
-              paddingLeft: 1,
-              paddingRight: 1,
-              backgroundColor: isActive ? T.bgSelected : undefined,
-            }}
-          >
-            <text fg={isActive ? color : T.comment} attributes={isActive ? 1 : 0}>
-              {label}
-            </text>
-          </box>
-        );
-      })}
+      {tabs.map((t) => (
+        <Chip
+          key={t.id}
+          label={t.id === "favorites" ? `★ Favorites(${favCount})` : t.label}
+          active={t.id === active}
+          color={t.color ?? colorForSource(t.id)}
+          activeBg={T.bgSelected}
+        />
+      ))}
       {showModels && (
         <box style={{ flexDirection: "row" }}>
           <text fg={T.fgGutter}>{"│ "}</text>
-          {MODEL_TABS.map((m) => {
-            const isActive = m === model;
-            return (
-              <box
-                key={m}
-                style={{
-                  marginRight: 1,
-                  paddingLeft: 1,
-                  paddingRight: 1,
-                  backgroundColor: isActive ? T.bgHighlight : undefined,
-                }}
-              >
-                <text fg={isActive ? T.yellow : T.comment} attributes={isActive ? 1 : 0}>
-                  {MODEL_LABEL[m]}
-                </text>
-              </box>
-            );
-          })}
+          {inline.map((m, i) => (
+            <Chip key={m ?? "all"} label={m ?? "All models"} active={i === modelIdx} />
+          ))}
+          {showOther && (
+            <Chip
+              label={picked ? `Other: ${picked}` : "Other ▾"}
+              active={modelIdx === inline.length}
+            />
+          )}
         </box>
+      )}
+    </box>
+  );
+}
+
+const PICKER_VISIBLE_ROWS = 10;
+
+function ModelPicker({
+  labels,
+  total,
+  maxLabel,
+  query,
+  selected,
+  screenW,
+  screenH,
+}: {
+  labels: string[];
+  total: number;
+  maxLabel: number;
+  query: string;
+  selected: number;
+  screenW: number;
+  screenH: number;
+}) {
+  // Explicit geometry: absolute boxes must not rely on intrinsic sizing.
+  const rows = Math.max(1, Math.min(total, PICKER_VISIBLE_ROWS));
+  const width = Math.min(Math.max(0, screenW - 8), Math.max(32, maxLabel + 8));
+  const height = rows + 4;
+  const innerW = width - 2;
+  const start = Math.max(0, Math.min(selected - Math.floor(rows / 2), labels.length - rows));
+  const visible = labels.slice(start, start + rows);
+
+  return (
+    <box
+      style={{
+        position: "absolute",
+        left: Math.max(0, Math.floor((screenW - width) / 2)),
+        top: Math.max(0, Math.floor((screenH - height) / 2)),
+        width,
+        height,
+        zIndex: 100,
+        flexDirection: "column",
+        backgroundColor: T.bgDark,
+        borderStyle: "single",
+        borderColor: T.border,
+      }}
+    >
+      <box style={{ flexDirection: "row", height: 1, paddingLeft: 1, paddingRight: 1 }}>
+        <SearchInput query={query} placeholder="filter models…" />
+      </box>
+      <Rule width={innerW} />
+      {visible.length === 0 ? (
+        <text fg={T.comment} style={{ paddingLeft: 2 }}>
+          no models match
+        </text>
+      ) : (
+        visible.map((m, i) => {
+          const sel = start + i === selected;
+          return (
+            <box
+              key={m}
+              style={{
+                flexDirection: "row",
+                height: 1,
+                width: innerW,
+                backgroundColor: sel ? T.bgSelected : undefined,
+              }}
+            >
+              <text fg={sel ? T.magenta : T.bgDark}>{sel ? "▌" : " "}</text>
+              <text fg={sel ? T.fg : T.fgDark}>{" " + m}</text>
+            </box>
+          );
+        })
       )}
     </box>
   );
@@ -411,24 +565,31 @@ function Footer({
   position,
   count,
   showModels,
+  pickerOpen,
+  onOther,
   copied,
   width,
 }: {
   position: number;
   count: number;
   showModels: boolean;
+  pickerOpen: boolean;
+  onOther: boolean;
   copied: boolean;
   width: number;
 }) {
-  const keys = [
-    "↑↓ nav",
-    "tab source",
-    showModels ? "←→ model" : "",
-    "⌘c copy",
-    "↵ favorite",
-    "type search",
-    "esc/^c quit",
-  ].filter(Boolean);
+  const keys = pickerOpen
+    ? ["↑↓ nav", "↵ apply", "esc close", "type filter"]
+    : [
+        "↑↓ nav",
+        "tab source",
+        showModels ? "←→ model" : "",
+        "⌘c copy",
+        onOther ? "↵ pick model" : "↵ favorite",
+        onOther ? "^s favorite" : "",
+        "type search",
+        "esc/^c quit",
+      ].filter(Boolean);
   return (
     <box style={{ flexDirection: "column", width, height: 2 }}>
       <Rule width={width} />

@@ -36,14 +36,19 @@ bun start
 | `↑` `↓` / `Ctrl-P` `Ctrl-N` | move selection |
 | `PgUp` `PgDn` | page |
 | `Tab` / `Shift-Tab` | cycle source: All · Claude · Codex · Pi · ★ Favorites |
-| `←` `→` | cycle Pi model filter (All · Opus 4.8 · Opus 4.7 · GPT-5.5) |
+| `←` `→` | cycle model filter (derived from what's loaded, most recent first) |
 | `Enter` / `Ctrl-S` | star / unstar the selected prompt |
+| `Enter` on `Other` chip | open the model picker (type to filter, `↑` `↓` select, `Enter` apply) |
 | `Ctrl-U` | clear search |
-| `Esc` / `Ctrl-C` | quit |
+| `Esc` / `Ctrl-C` | close the model picker if open, otherwise quit |
 
 
 > [!NOTE]
-> The model filter only applies while viewing **Pi** sessions.
+> The model filter tabs are derived from whatever models show up in the
+> current view (any source, including All and Favorites) and only appear
+> once 2+ distinct models are present, ordered by most recent use. Beyond
+> the first 3 they fold behind an `Other` chip — `Enter` on it opens a
+> searchable picker of every model in the view.
 
 ## Custom filters
 
@@ -105,7 +110,7 @@ export default ({ defineFileSource, makePrompt }: ConfigApi) => ({
               ts: event.timestamp,
               cwd: event.cwd,
               sessionId: event.session_id,
-              model: event.model,     // classified into a model label/key
+              model: event.model,     // formatted into a display label
             });
           });
       },
@@ -140,10 +145,10 @@ export default ({ defineSource, makePrompt }: ConfigApi) => ({
 });
 ```
 
-Custom sources are merged after the built-ins and each gets its own tab. Set
-`modelFilters: true` on a source to enable the `←`/`→` model filter for it.
-Return `includeBuiltins: false` to replace the built-in sources entirely —
-useful for a demo dataset:
+Custom sources are merged after the built-ins and each gets its own tab. The
+model filter tabs appear automatically once a view has 2+ distinct models,
+no configuration needed. Return `includeBuiltins: false` to replace the
+built-in sources entirely — useful for a demo dataset:
 
 ```ts
 export default ({ defineSource, makePrompt }: ConfigApi) => {
