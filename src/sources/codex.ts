@@ -26,6 +26,7 @@ interface UserLine {
   text: string;
   ts: unknown;
   model?: string;
+  unsent: boolean;
 }
 
 export function parseCodex(file: string, raw: string): Prompt[] {
@@ -39,6 +40,7 @@ export function parseCodex(file: string, raw: string): Prompt[] {
   let sessionFallbackModel: string | undefined;
   let nearestTurnContextModel: string | undefined;
   let hasEventUsers = false;
+  let repliedAfter = false;
   const eventUsers: UserLine[] = [];
   const itemUsers: UserLine[] = [];
 
@@ -72,6 +74,14 @@ export function parseCodex(file: string, raw: string): Prompt[] {
     }
 
     const p = e.payload;
+    const isReply =
+      (e.type === "event_msg" && p?.type === "agent_message") ||
+      (e.type === "response_item" && p?.type === "message" && p.role === "assistant");
+    if (isReply) {
+      repliedAfter = true;
+      continue;
+    }
+
     const isEventUser = e.type === "event_msg" && p?.type === "user_message";
     const isItemUser =
       e.type === "response_item" && p?.type === "message" && p.role === "user";
@@ -80,7 +90,7 @@ export function parseCodex(file: string, raw: string): Prompt[] {
       hasEventUsers = true;
       const text = typeof p.message === "string" ? p.message : joinContent(p.message);
       if (!isBlank(text) && !looksInjected(text)) {
-        eventUsers.push({ line: i, text, ts: e.timestamp, model: nearestTurnContextModel });
+        eventUsers.push({ line: i, text, ts: e.timestamp, model: nearestTurnContextModel, unsent: !repliedAfter });
       }
       continue;
     }
@@ -88,7 +98,7 @@ export function parseCodex(file: string, raw: string): Prompt[] {
     if (isItemUser) {
       const text = joinContent(p.content);
       if (!isBlank(text) && !looksInjected(text)) {
-        itemUsers.push({ line: i, text, ts: e.timestamp, model: nearestTurnContextModel });
+        itemUsers.push({ line: i, text, ts: e.timestamp, model: nearestTurnContextModel, unsent: !repliedAfter });
       }
     }
   }
@@ -111,6 +121,7 @@ export function parseCodex(file: string, raw: string): Prompt[] {
         provider,
         modelLabel: model ? undefined : "Codex",
         agent: agentThread,
+        unsent: u.unsent,
       }),
     );
   }

@@ -134,4 +134,11 @@ describe("formatRecord", () => {
       "── claude · agent · Fable 5 · prompt-picker · Jul 21 14:32 · 019f4aec-1234-5678-9abc-def012345678\nprompt text...",
     );
   });
+
+  test("unsent prompts are marked in the header", () => {
+    const opts: HeaderOpts = { showModel: true, compact: false, hasSource: false };
+    expect(formatRecord({ ...prompt, unsent: true }, opts)).toBe(
+      "── claude · unsent · Fable 5 · prompt-picker · Jul 21 14:32 · 019f4aec-1234-5678-9abc-def012345678\nprompt text...",
+    );
+  });
 });

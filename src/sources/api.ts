@@ -44,6 +44,7 @@ export interface PromptInput {
   provider?: string;
   modelLabel?: string;
   agent?: boolean;
+  unsent?: boolean;
 }
 
 export function defineFileSource(input: FilePromptSourceInput): FilePromptSource {
@@ -72,6 +73,7 @@ export function makePrompt(input: PromptInput): Prompt {
     sessionId: input.sessionId ?? input.file,
     file: input.file,
     agent: input.agent ? true : undefined,
+    unsent: input.unsent ? true : undefined,
   };
 }
 

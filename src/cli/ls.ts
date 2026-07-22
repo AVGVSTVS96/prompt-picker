@@ -26,7 +26,7 @@ export interface HeaderOpts {
 
 export function formatRecord(prompt: Prompt, opts: HeaderOpts): string {
   const sid = sessionLabel(prompt.sessionId);
-  const tag = prompt.agent ? ["agent"] : [];
+  const tag = [...(prompt.agent ? ["agent"] : []), ...(prompt.unsent ? ["unsent"] : [])];
   const fields = opts.compact
     ? opts.hasSource
       ? [...tag, sid]
@@ -54,6 +54,7 @@ export async function run(argv: string[]): Promise<void> {
       raw: { type: "boolean", default: false },
       compact: { type: "boolean", short: "c", default: false },
       agents: { type: "boolean", default: false },
+      unsent: { type: "boolean", default: false },
     },
   });
 
@@ -69,7 +70,11 @@ export async function run(argv: string[]): Promise<void> {
   }
 
   const config = await loadConfig();
-  const { prompts } = await buildIndex({ sources: configuredSources(config), agents: values.agents });
+  const { prompts } = await buildIndex({
+    sources: configuredSources(config),
+    agents: values.agents,
+    unsent: values.unsent,
+  });
   let pool = values.raw ? prompts : applyConfigFilters(prompts, config.filters);
 
   const now = Date.now();

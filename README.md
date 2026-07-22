@@ -73,8 +73,10 @@ Flags: `--since`/`-s <n>h|d|w|<n>` (default `3d`; a bare number means days —
 `Prompt` per line), `--raw` (skip config filters — custom sources still
 load), `--compact`/`-c` (session id only, no `--json`), `--agents` (include
 prompts written by agents and apps — subagent transcripts, SDK-driven
-sessions — hidden by default and marked `agent` in the header). Results are
-capped at 100, newest/most-relevant first.
+sessions — hidden by default and marked `agent` in the header), `--unsent`
+(include prompts that never got a reply — killed, quit, or errored
+sessions — hidden by default and marked `unsent`). Results are capped at
+100, newest/most-relevant first.
 
 Each prompt is printed under a one-line header:
 

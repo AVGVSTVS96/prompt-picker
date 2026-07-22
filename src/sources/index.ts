@@ -12,7 +12,7 @@ const CACHE_DIR = configDir();
 const CACHE_FILE = join(CACHE_DIR, "index-cache.json");
 // The cache stores parser OUTPUT, so stale entries survive until their file
 // changes: bump this whenever a parser's behavior or the Prompt shape changes.
-const CACHE_VERSION = 14;
+const CACHE_VERSION = 15;
 
 interface Cache {
   version: number;
@@ -52,6 +52,8 @@ export interface BuildIndexOptions {
   sources?: PromptSource[];
   /** Include agent-written prompts (subagent transcripts, SDK-driven sessions). */
   agents?: boolean;
+  /** Include prompts that never received a reply (killed, quit, or errored sessions). */
+  unsent?: boolean;
 }
 
 // Cap concurrent stat/read/parse jobs so a cold index over a large corpus
@@ -160,6 +162,7 @@ export async function buildIndex(options: BuildIndexOptions = {}): Promise<Index
   let prompts: Prompt[] = [...loadedPrompts];
   for (const entry of Object.values(next)) prompts.push(...entry.prompts);
   if (!options.agents) prompts = prompts.filter((p) => !p.agent);
+  if (!options.unsent) prompts = prompts.filter((p) => !p.unsent);
   prompts.sort((a, b) => b.ts - a.ts);
 
   return { prompts, sources: sourceMetas, scanned, parsed, reused };

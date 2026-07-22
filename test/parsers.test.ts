@@ -73,6 +73,21 @@ describe("parseClaude", () => {
     ]);
   });
 
+  test("tags prompts with no reply after them as unsent", () => {
+    const raw = jsonl(
+      { type: "user", message: { content: "answered" } },
+      { type: "assistant", message: { model: "claude-fable-5" } },
+      { type: "user", message: { content: "never answered" } },
+      { type: "assistant", message: { model: "<synthetic>" } },
+    );
+    const out = parseClaude("/c/file.jsonl", raw);
+    expect(out.map((p) => [p.text, p.unsent])).toEqual([
+      ["never answered", true],
+      ["answered", undefined],
+    ]);
+    expect(out[0].modelLabel).toBe("Fable 5");
+  });
+
   test("parses subagents/ transcript files fully, tagging every prompt as agent", () => {
     const raw = jsonl(
       { type: "user", isSidechain: true, message: { content: "subagent task" } },
@@ -120,6 +135,20 @@ describe("parseCodex", () => {
       { type: "event_msg", payload: { type: "user_message", message: "kept" } },
     );
     expect(parseCodex("/x/file.jsonl", raw).map((p) => p.text)).toEqual(["kept"]);
+  });
+
+  test("tags prompts with no agent reply after them as unsent", () => {
+    const raw = jsonl(
+      { type: "session_meta", payload: { id: "sess" } },
+      { type: "event_msg", payload: { type: "user_message", message: "answered" } },
+      { type: "event_msg", payload: { type: "agent_message", message: "reply" } },
+      { type: "event_msg", payload: { type: "user_message", message: "never answered" } },
+    );
+    const out = parseCodex("/x/file.jsonl", raw);
+    expect(out.map((p) => [p.text, p.unsent])).toEqual([
+      ["never answered", true],
+      ["answered", undefined],
+    ]);
   });
 
   test("tags subagent threads as agent (source and thread_source markers)", () => {

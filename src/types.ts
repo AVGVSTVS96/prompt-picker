@@ -20,6 +20,8 @@ export interface Prompt {
   file: string;
   /** Written by an agent or app, not typed by the user. Hidden unless explicitly requested. */
   agent?: true;
+  /** Never received a reply (session killed, quit, or errored). Hidden unless explicitly requested. */
+  unsent?: true;
 }
 
 export interface FileEntry {

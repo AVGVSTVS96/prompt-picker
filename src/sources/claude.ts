@@ -101,7 +101,10 @@ export function parseClaude(file: string, raw: string): Prompt[] {
 
   const out: Prompt[] = [];
   for (const u of users) {
+    // No reply model after the prompt means it was never answered:
+    // the session was killed, quit, or errored before a response landed.
     const model = modelAt[u.line] ?? sessionFallbackModel;
+    const unsent = modelAt[u.line] === undefined;
     out.push(
       makePrompt({
         source: "claude",
@@ -116,6 +119,7 @@ export function parseClaude(file: string, raw: string): Prompt[] {
         provider: "anthropic",
         modelLabel: model ? undefined : "Claude",
         agent: u.agent,
+        unsent,
       }),
     );
   }
