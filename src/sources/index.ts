@@ -12,7 +12,7 @@ const CACHE_DIR = configDir();
 const CACHE_FILE = join(CACHE_DIR, "index-cache.json");
 // The cache stores parser OUTPUT, so stale entries survive until their file
 // changes: bump this whenever a parser's behavior or the Prompt shape changes.
-const CACHE_VERSION = 15;
+const CACHE_VERSION = 16;
 
 interface Cache {
   version: number;

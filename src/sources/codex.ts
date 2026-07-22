@@ -6,6 +6,7 @@ const INJECTED_PREFIXES = [
   "<environment_context>",
   "<user_instructions>",
   "<user_shell_environment>",
+  "<user_shell_command>",
   "<system-reminder>",
   "## My request for Codex:",
 ];
