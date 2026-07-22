@@ -15,7 +15,7 @@ export interface SourceLoadInput {
 export interface FilePromptSource extends SourceInfo {
   type: "file";
   root: string;
-  glob: string;
+  glob: string | string[];
   parse(input: FileParseInput): Prompt[] | Promise<Prompt[]>;
 }
 
@@ -43,6 +43,7 @@ export interface PromptInput {
   model?: string;
   provider?: string;
   modelLabel?: string;
+  agent?: boolean;
 }
 
 export function defineFileSource(input: FilePromptSourceInput): FilePromptSource {
@@ -70,6 +71,7 @@ export function makePrompt(input: PromptInput): Prompt {
     project: input.project ?? projectName(input.cwd),
     sessionId: input.sessionId ?? input.file,
     file: input.file,
+    agent: input.agent ? true : undefined,
   };
 }
 

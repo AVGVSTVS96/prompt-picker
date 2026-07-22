@@ -45,6 +45,40 @@ describe("parseClaude", () => {
     const raw = jsonl({ type: "user", message: { content: "hi" } });
     expect(parseClaude("/c/file.jsonl", raw)[0].modelLabel).toBe("Claude");
   });
+
+  test("drops sidechain records: subagent prompts and their models", () => {
+    const raw = jsonl(
+      { type: "user", isSidechain: true, message: { content: "prompt Claude wrote for a subagent" } },
+      { type: "user", message: { content: "kept" } },
+      { type: "assistant", isSidechain: true, message: { model: "claude-haiku-4-5" } },
+      { type: "assistant", message: { model: "claude-fable-5" } },
+    );
+    const out = parseClaude("/c/file.jsonl", raw);
+    expect(out.map((p) => p.text)).toEqual(["kept"]);
+    expect(out[0].modelLabel).toBe("Fable 5");
+  });
+
+  test("tags sdk-driven prompts (entrypoint sdk-cli) as agent", () => {
+    const raw = jsonl(
+      { type: "user", entrypoint: "sdk-cli", message: { content: "app-generated prompt" } },
+      { type: "user", entrypoint: "cli", message: { content: "typed prompt" } },
+    );
+    const out = parseClaude("/c/file.jsonl", raw);
+    expect(out.map((p) => [p.text, p.agent])).toEqual([
+      ["typed prompt", undefined],
+      ["app-generated prompt", true],
+    ]);
+  });
+
+  test("parses subagents/ transcript files fully, tagging every prompt as agent", () => {
+    const raw = jsonl(
+      { type: "user", isSidechain: true, message: { content: "subagent task" } },
+      { type: "assistant", isSidechain: true, message: { model: "claude-haiku-4-5" } },
+    );
+    const out = parseClaude("/c/proj/sess/subagents/agent-1.jsonl", raw);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ text: "subagent task", agent: true, modelLabel: "Haiku 4.5" });
+  });
 });
 
 describe("parseCodex", () => {
@@ -83,6 +117,24 @@ describe("parseCodex", () => {
       { type: "event_msg", payload: { type: "user_message", message: "kept" } },
     );
     expect(parseCodex("/x/file.jsonl", raw).map((p) => p.text)).toEqual(["kept"]);
+  });
+
+  test("tags subagent threads as agent (source and thread_source markers)", () => {
+    const bySource = jsonl(
+      { type: "session_meta", payload: { id: "sub", source: { subagent: { parent_thread_id: "t1" } } } },
+      { type: "event_msg", payload: { type: "user_message", message: "parent-written prompt" } },
+    );
+    const byThreadSource = jsonl(
+      { type: "session_meta", payload: { id: "sub", thread_source: { subagent: "review" } } },
+      { type: "event_msg", payload: { type: "user_message", message: "review prompt" } },
+    );
+    expect(parseCodex("/x/a.jsonl", bySource).map((p) => p.agent)).toEqual([true]);
+    expect(parseCodex("/x/b.jsonl", byThreadSource).map((p) => p.agent)).toEqual([true]);
+    const userThread = jsonl(
+      { type: "session_meta", payload: { id: "s", source: "cli" } },
+      { type: "event_msg", payload: { type: "user_message", message: "typed" } },
+    );
+    expect(parseCodex("/x/c.jsonl", userThread)[0].agent).toBeUndefined();
   });
 });
 

@@ -12,7 +12,8 @@ export function builtinSources(home = homedir()): PromptSource[] {
       label: "Claude",
       color: "#ff9e64",
       root: join(home, ".claude", "projects"),
-      glob: "*/*.jsonl",
+      // Top-level session files, plus per-session subagent transcripts.
+      glob: ["*/*.jsonl", "*/*/subagents/*.jsonl"],
       parse: ({ file, raw }) => parseClaude(file, raw),
     }),
     defineFileSource({

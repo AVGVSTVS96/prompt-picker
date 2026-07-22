@@ -45,9 +45,13 @@ interface UserLine {
   ts: unknown;
   cwd?: string;
   sessionId: string;
+  agent?: boolean;
 }
 
 export function parseClaude(file: string, raw: string): Prompt[] {
+  // Subagent transcripts live in their own subagents/ directory; every prompt
+  // in them was written by the parent agent.
+  const agentFile = file.includes("/subagents/");
   const lines = raw.split("\n");
   const users: UserLine[] = [];
   const modelAt = new Array<string | undefined>(lines.length);
@@ -64,6 +68,9 @@ export function parseClaude(file: string, raw: string): Prompt[] {
     } catch {
       continue;
     }
+
+    // In a main session, sidechain records are interleaved subagent noise.
+    if (!agentFile && e.isSidechain === true) continue;
 
     if (e.type === "assistant") {
       const m = e.message?.model;
@@ -84,6 +91,8 @@ export function parseClaude(file: string, raw: string): Prompt[] {
         ts: e.timestamp,
         cwd: typeof e.cwd === "string" ? e.cwd : undefined,
         sessionId: typeof e.sessionId === "string" ? e.sessionId : file,
+        // sdk-cli sessions are app-driven (Claude Agent SDK), not typed by the user.
+        agent: agentFile || e.entrypoint === "sdk-cli",
       });
     }
   }
@@ -104,6 +113,7 @@ export function parseClaude(file: string, raw: string): Prompt[] {
         model,
         provider: "anthropic",
         modelLabel: model ? undefined : "Claude",
+        agent: u.agent,
       }),
     );
   }

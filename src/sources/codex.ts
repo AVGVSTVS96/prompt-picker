@@ -35,6 +35,7 @@ export function parseCodex(file: string, raw: string): Prompt[] {
   let sessionId = file;
   let provider = "openai";
   let sawSessionMeta = false;
+  let agentThread = false;
   let sessionFallbackModel: string | undefined;
   let nearestTurnContextModel: string | undefined;
   let hasEventUsers = false;
@@ -53,6 +54,10 @@ export function parseCodex(file: string, raw: string): Prompt[] {
 
     if (e.type === "session_meta" && e.payload && !sawSessionMeta) {
       const p = e.payload;
+      // Subagent threads get their own session file; their prompts were written
+      // by the parent agent, not the user.
+      const origin = p.source ?? p.thread_source;
+      if (typeof origin === "object" && origin !== null && "subagent" in origin) agentThread = true;
       if (typeof p.cwd === "string") cwd = p.cwd;
       if (typeof p.id === "string") sessionId = p.id;
       if (typeof p.model_provider === "string") provider = p.model_provider;
@@ -105,6 +110,7 @@ export function parseCodex(file: string, raw: string): Prompt[] {
         model,
         provider,
         modelLabel: model ? undefined : "Codex",
+        agent: agentThread,
       }),
     );
   }

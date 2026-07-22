@@ -18,6 +18,8 @@ export interface Prompt {
   project?: string;
   sessionId: string;
   file: string;
+  /** Written by an agent or app, not typed by the user. Hidden unless explicitly requested. */
+  agent?: true;
 }
 
 export interface FileEntry {
