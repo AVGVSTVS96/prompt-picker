@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "bin": {
-    "pp": "src/cli/pp.ts"
+    "prompts": "src/cli/pk.ts",
+    "pk": "src/cli/pk.ts"
   },
   "exports": {
     ".": "./src/config.ts",

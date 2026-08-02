@@ -42,21 +42,57 @@ export function formatRecord(prompt: Prompt, opts: HeaderOpts): string {
   return `── ${fields.join(" · ")}\n${prompt.text}`;
 }
 
+export const HELP = `pk — browse prompts from your coding sessions
+
+usage
+  pk                      TTY: launch the TUI · piped: same as \`pk ls\`
+  pk <query>              search recent prompts
+  pk ls [flags]           list mode, always
+
+  \`prompts\` is an alias for \`pk\`.
+
+flags
+  -s, --since <n>[h|d|w]  time window, default 3d; bare n means days
+      --source <id>       limit to one source
+  -m, --model <q>         model filter; header drops the model when set
+      --json              JSONL, one Prompt per line
+      --raw               skip config filters (custom sources still load)
+  -c, --compact           session id only; not valid with --json
+      --agents            include agent/SDK prompts (marked \`agent\`)
+      --unsent            include prompts that got no reply (marked \`unsent\`)
+  -h, --help              show this
+
+Results cap at 100, newest or most-relevant first.`;
+
 export async function run(argv: string[]): Promise<void> {
-  const { values, positionals } = parseArgs({
-    args: argv,
-    allowPositionals: true,
-    options: {
-      since: { type: "string", short: "s", default: "3d" },
-      source: { type: "string" },
-      model: { type: "string", short: "m" },
-      json: { type: "boolean", default: false },
-      raw: { type: "boolean", default: false },
-      compact: { type: "boolean", short: "c", default: false },
-      agents: { type: "boolean", default: false },
-      unsent: { type: "boolean", default: false },
-    },
-  });
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      allowPositionals: true,
+      options: {
+        help: { type: "boolean", short: "h", default: false },
+        since: { type: "string", short: "s", default: "3d" },
+        source: { type: "string" },
+        model: { type: "string", short: "m" },
+        json: { type: "boolean", default: false },
+        raw: { type: "boolean", default: false },
+        compact: { type: "boolean", short: "c", default: false },
+        agents: { type: "boolean", default: false },
+        unsent: { type: "boolean", default: false },
+      },
+    });
+  } catch (err) {
+    // parseArgs throws on unknown/malformed flags; a stack trace helps nobody
+    console.error(`${err instanceof Error ? err.message : err}\n\nrun \`pk --help\` for usage`);
+    process.exit(1);
+  }
+  const { values, positionals } = parsed;
+
+  if (values.help) {
+    console.log(HELP);
+    return;
+  }
 
   if (values.compact && values.json) {
     console.error("--compact and --json are mutually exclusive");

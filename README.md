@@ -52,20 +52,23 @@ bun start
 
 ## CLI
 
-`pp` on a real terminal launches the TUI. Piped or redirected (how LLMs run
+Installs two names for the same command: `prompts` (explicit) and `pk`
+(short). Use whichever fits; every example below works with either.
+
+`pk` on a real terminal launches the TUI. Piped or redirected (how LLMs run
 it), it lists recent prompts and exits — built for agents to grep/read
 without spending context on a UI. Any positional args, or an explicit `ls`,
 also force list mode.
 
 ```bash
-pp                          # TTY: TUI · piped: same as `pp ls`
-pp fix the flaky test       # search
-pp ls -s 24h                # last day, newest first
-pp ls -s 3                  # bare number = days, same as -s 3d
-pp ls --source codex        # one source
-pp ls -m opus                # model filter, see rule below
-pp ls --json --since 1w > out.jsonl
-pp ls -s 1 -c                # compact headers
+pk                          # TTY: TUI · piped: same as `pk ls`
+pk fix the flaky test       # search
+pk ls -s 24h                # last day, newest first
+pk ls -s 3                  # bare number = days, same as -s 3d
+pk ls --source codex        # one source
+pk ls -m opus                # model filter, see rule below
+pk ls --json --since 1w > out.jsonl
+pk ls -s 1 -c                # compact headers
 ```
 
 Flags: `--since`/`-s <n>h|d|w|<n>` (default `3d`; a bare number means days —
