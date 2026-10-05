@@ -1,15 +1,37 @@
 # prompt-picker
 
-A fast TUI for browsing and searching prompts sent to coding agents.
+A fast TUI and CLI for searching every prompt you've sent to your coding agents.
 
-Currently supports **Claude Code**, **Codex (TUI and GUI)**, and **Pi**
-Built with [OpenTUI](https://github.com/sst/opentui).
+Supports **Claude Code**, **Codex (TUI and GUI)**, and **Pi** out of the box.
+Anything else is a [few lines of config](#make-it-yours) away.
+Built with [OpenTUI](https://github.com/sst/opentui), runs on Bun.
+
+![prompt-picker demo](demo/demo.gif)
+
+- **Live search** across every session, with matches highlighted in the list and the detail pane
+- **Filter by source and model.** Model tabs come from your own history, newest first
+- **Star the good ones** and find them later in Favorites
+- **`pk ls`** for scripts and agents: the same data, as plain text or JSONL
+- **Make it yours**: add your own [filters](#custom-filters) and [sources](#custom-sources) in one `config.ts`, built on the same API as the built-ins
+
+| Search, highlighted | Filter by model |
+| :-----------------: | :-------------: |
+| ![search](demo/search.png) | ![model tabs](demo/models.png) |
+| **Pick from every model you've used** | **Favorites** |
+| ![model picker](demo/picker.png) | ![favorites](demo/favorites.png) |
 
 ## What it shows
 
-Only **user prompts you actually typed** — tool results, slash-command
-expansions, skill blocks, injected file/branch/compaction context, and shell
-(`!`) commands are all filtered out at parse time.
+Only **prompts you actually typed.** Tool results, slash-command
+expansions, skill blocks, injected file/branch/compaction context, system
+reminders, and shell (`!`) commands are all filtered out at parse time.
+
+Two more kinds are kept but hidden unless you ask for them:
+
+| Tag | Meaning | Opt in |
+| --- | ------- | ------ |
+| `agent` | written by an agent or app, not you (subagent transcripts, SDK sessions) | `--agents` |
+| `unsent` | never got a reply (session killed, quit, or errored) | `--unsent` |
 
 | Source | Location |
 | ------ | -------- |
@@ -105,10 +127,21 @@ newest GPT release, not every one you've ever used.
 
 Config filters (see below) apply by default; `--raw` skips them.
 
-## Custom filters
+## Make it yours
 
-Drop a `config.ts` in `~/.config/prompt-picker/` to use custom filters.
-Export a `filters` array of predicates, a prompt is shown only if
+Everything is configured from one file, `~/.config/prompt-picker/config.ts`.
+It's plain TypeScript, so a filter or a source can be anything you can write
+as a function.
+
+Claude, Codex, and Pi aren't special. They're declared with the same
+`defineFileSource` / `makePrompt` API your config gets, so anything a
+built-in can do, your config can do too. The demo above is an example:
+[its config](demo/config/prompt-picker/config.ts) swaps out the built-ins
+for a source of fake prompts.
+
+### Custom filters
+
+Export a `filters` array of predicates. A prompt is shown only if
 **every** filter returns true for it.
 
 ```ts
@@ -118,21 +151,22 @@ import type { Filter } from "prompt-picker";
 export const filters: Filter[] = [
   (p) => p.text.length > 8,              // drop throwaway prompts
   (p) => p.ts > Date.now() - 90 * 864e5, // only the last 90 days
+  (p) => p.project !== "client-work",    // keep one repo out of view
 ];
 ```
 
 Each predicate receives a full [`Prompt`](src/types.ts) (`text`, `source`,
 `model`, `ts`, `project`, …), so you can filter on anything.
 
-Filtering runs at load time and never touches the cache, so edits take effect
-on the next launch, no reindex. A broken config is reported to stderr and otherwise ignored.
+Filters run at load time and never touch the cache, so edits take effect
+on the next launch with no reindex. A broken config is reported to stderr and
+otherwise ignored.
 
-## Custom sources
+### Custom sources
 
-Claude, Codex, and Pi ship as built-in sources, but they are not special — they
-use the same public API any config can use. Add your own local prompt sources
-by exporting a config **factory** from `config.ts`. The factory receives the
-source API and returns `{ filters, sources, includeBuiltins }`.
+Using an agent that isn't built in? Teach prompt-picker to read it. Export a
+config **factory** from `config.ts`: it receives the source API and returns
+`{ filters, sources, includeBuiltins }`.
 
 `defineFileSource` scans files on disk and parses them into prompts. Use
 `makePrompt` to fill in stable ids, timestamps, project names, and model
@@ -228,5 +262,4 @@ Favorites persist to `~/.config/prompt-picker/favorites.json`.
 
 ---
 
-Built by [Bassim](https://x.com/avgvstvs96), with help from Opus 4.8 and GPT-5.5 in [Pi](https://github.com/earendil-works/pi)
-
+Built by [Bassim](https://x.com/avgvstvs96)

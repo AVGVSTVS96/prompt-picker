@@ -38,26 +38,46 @@ Sleep 1s
 Ctrl+U
 Sleep 600ms
 Tab
-Sleep 900ms
-Tab
-Sleep 900ms
-Tab
-Sleep 1.2s
-Screenshot pimodels.png
-Right
 Sleep 1.2s
 Right
 Sleep 1.2s
-Left
-Sleep 800ms
+Right
+Sleep 1.5s
+Screenshot models.png
+Right
+Sleep 1.2s
 
+Shift+Tab
+Sleep 900ms
+Right
+Sleep 700ms
+Right
+Sleep 700ms
+Right
+Sleep 700ms
+Right
+Sleep 900ms
+Enter
+Sleep 900ms
+Type "gpt"
+Sleep 1s
+Down
+Sleep 1.2s
+Screenshot picker.png
+Enter
+Sleep 1.5s
+
+Right
+Sleep 1s
 Enter
 Sleep 600ms
 Down
 Sleep 400ms
+Down
+Sleep 400ms
 Enter
 Sleep 800ms
-Tab
+Shift+Tab
 Sleep 1.5s
 Screenshot favorites.png
 Sleep 1s

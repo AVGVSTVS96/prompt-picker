@@ -4,9 +4,10 @@ All demo media is rendered with [vhs](https://github.com/charmbracelet/vhs) (`br
 
 ```sh
 cd demo && rm -f config/prompt-picker/favorites.json && vhs demo.tape
+ffmpeg -y -i demo.mp4 -vf "fps=15,scale=1300:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle" demo.gif
 ```
 
-Takes ~90s. Outputs land in `demo/`: `demo.gif`, `demo.mp4`, and four PNGs (`home`, `search`, `pimodels`, `favorites`).
+Takes ~2 min. Outputs land in `demo/`: `demo.mp4`, five PNGs (`home`, `search`, `models`, `picker`, `favorites`), and `demo.gif`. The ffmpeg step replaces vhs's 2x GIF (~7.5MB) with a 1x one (~3.5MB) for the README; keep the full palette, since fewer colors merges the source label colors.
 
 ## How it works
 
@@ -25,8 +26,8 @@ Takes ~90s. Outputs land in `demo/`: `demo.gif`, `demo.mp4`, and four PNGs (`hom
 - `Output`/`Screenshot` paths must be bare relative filenames — absolute paths and hyphens in filenames break the tape parser. Run vhs from `demo/`.
 - Tape strings can't contain escaped quotes (`\"`). Keep shell commands quote-free inside `Type "..."`.
 - The app run is wrapped in `Hide`/`Show` so the launch command isn't in the recording; end with `Escape` (quit) before the final `Hide` so the app exits cleanly.
-- GIF at 2x is ~5MB; prefer `demo.mp4` (~2MB, better quality) when embedding somewhere size-sensitive.
+- vhs's own GIF at 2x is ~7.5MB, which is why the ffmpeg step re-encodes it at 1x.
 
 ## Verifying output
 
-Screenshots are PNGs — view them directly (agents: use the Read tool on the PNG) and check: search-term highlighting in list + detail, footer keybind hints, favorites count. `sips -g pixelWidth demo/home.png` should report 2600.
+Screenshots are PNGs — view them directly (agents: use the Read tool on the PNG) and check: search-term highlighting in list + detail, model tabs with the `Other ▾` chip, the model picker overlay, footer keybind hints, favorites count. `sips -g pixelWidth demo/home.png` should report 2600.
